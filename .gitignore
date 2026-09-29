@@ -1,0 +1,6 @@
+# macOS
+.DS_Store
+__MACOSX/
+
+# Local web scrapes (see docs/research/sources-and-decisions.md)
+.firecrawl/
