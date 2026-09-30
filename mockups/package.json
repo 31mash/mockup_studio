@@ -1,0 +1,49 @@
+{
+  "name": "indigo-food-mockups",
+  "private": true,
+  "type": "module",
+  "description": "Artwork rasterizer for the Blender product mockups (SVG to PNG with bundled fonts).",
+  "scripts": {
+    "art": "node tools/raster.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  },
+  "dependencies": {
+    "@fontsource/abril-fatface": "^5.3.0",
+    "@fontsource/alfa-slab-one": "^5.3.0",
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/archivo": "^5.3.0",
+    "@fontsource/archivo-black": "^5.3.0",
+    "@fontsource/baloo-2": "^5.3.0",
+    "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/bevan": "^5.3.0",
+    "@fontsource/caveat-brush": "^5.3.0",
+    "@fontsource/comfortaa": "^5.3.0",
+    "@fontsource/courier-prime": "^5.3.0",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/kalam": "^5.3.0",
+    "@fontsource/libre-baskerville": "^5.3.0",
+    "@fontsource/lobster": "^5.3.0",
+    "@fontsource/mukta": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "@fontsource/noto-sans-tamil": "^5.3.0",
+    "@fontsource/noto-serif-devanagari": "^5.3.0",
+    "@fontsource/noto-serif-tamil": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "@fontsource/old-standard-tt": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/permanent-marker": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fontsource/quicksand": "^5.3.0",
+    "@fontsource/roboto-slab": "^5.3.0",
+    "@fontsource/rye": "^5.3.0",
+    "@fontsource/special-elite": "^5.3.0",
+    "@fontsource/tiro-devanagari-hindi": "^5.3.0",
+    "@fontsource/varela-round": "^5.3.0",
+    "@fontsource/yatra-one": "^5.3.0",
+    "@fontsource/zilla-slab": "^5.3.0"
+  }
+}

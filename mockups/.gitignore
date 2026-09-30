@@ -1,0 +1,8 @@
+node_modules/
+__pycache__/
+# Artwork PNGs are generated from the SVG/HTML beside them (make_art.py + tools/raster.mjs).
+# Hand-made raster sources belong in products/<id>/art/src/.
+products/*/art/*.png
+products/*/art/_raster_*
+# Working previews; finals live in renders/.
+products/*/preview/
