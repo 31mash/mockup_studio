@@ -223,12 +223,33 @@ def foil_tray(ctx, name, mat, x, y, z0):
     return [ob, bead]
 
 
+def crinkled_foil(ctx, name):
+    """The studio's foil, crumpled harder, as a pressed tray's rim and walls
+    are: its coarse facets plus a fine crinkle."""
+    m = ctx.mat.foil(name, roughness=0.26, crinkle=0.4)
+    nt = m.node_tree
+    p = nt.nodes['Principled BSDF']
+    coarse = p.inputs['Normal'].links[0].from_node
+    coord = nt.nodes.new('ShaderNodeTexCoord')
+    n = nt.nodes.new('ShaderNodeTexNoise')
+    n.inputs['Scale'].default_value = 15.0
+    n.inputs['Detail'].default_value = 8.0
+    n.inputs['Distortion'].default_value = 0.8
+    nt.links.new(coord.outputs['Object'], n.inputs['Vector'])
+    b = nt.nodes.new('ShaderNodeBump')
+    b.inputs['Strength'].default_value = 0.4
+    b.inputs['Distance'].default_value = 0.01
+    nt.links.new(n.outputs['Fac'], b.inputs['Height'])
+    nt.links.new(b.outputs['Normal'], coarse.inputs['Normal'])
+    return m
+
+
 def dosa_material(ctx, name='dosa'):
-    """A crisp dosa, procedurally, matched to the photo's piece: an orange-
-    golden crepe (about #c87f38 printed flat) mottled with deeper browning,
-    a lacy network where the batter caught, and a dense scatter of small dark
-    specks (browned pores and podi). Relief: the specks are tiny pits, the
-    lace a slight ridge, plus a soft undulation. A thin sheen of ghee."""
+    """A crisp dosa, procedurally, matched to the photo's piece: a bright
+    golden crepe, yellower where thin, deeper amber in patches, covered in
+    the honeycomb of orange-brown browned pores (darker at their centres)
+    that a dosa gets on the griddle. The pores are shallow pits; a soft
+    undulation over all; a thin sheen of ghee."""
     m = ctx.mat.solid(name, '#c98035', roughness=0.5)
     nt = m.node_tree
     p = nt.nodes['Principled BSDF']
@@ -289,71 +310,63 @@ def dosa_material(ctx, name='dosa'):
     L(coord, wv.inputs[2])
     wc = wv.outputs['Vector']
 
-    def specks(scale, size, keep, seed_off):
-        """Round dark dots from a Voronoi field: `size` is the dot radius as a
-        fraction of the cell, `keep` the share of cells that get one."""
+    broad = noise(0.7, 3.0)
+    patch = noise(2.4, 5.0, 0.62, distortion=0.4)
+
+    def pits(scale, size, keep, seed_off, soft=0.5):
+        """Soft round spots from a Voronoi field (1 at the centre), sized per
+        cell: the browned pores of a crisp dosa."""
         v = N('ShaderNodeTexVoronoi')
         v.voronoi_dimensions = '4D'
         v.inputs['Scale'].default_value = scale
         v.inputs['W'].default_value = seed_off
-        v.inputs['Randomness'].default_value = 1.0
+        v.inputs['Randomness'].default_value = 0.85
         L(wc, v.inputs['Vector'])
-        # Dot radius varies per cell.
         sep = N('ShaderNodeSeparateColor')
         L(v.outputs['Color'], sep.inputs['Color'])
-        r = math_('MULTIPLY_ADD', sep.outputs['Green'], size * 0.8)
-        L_in = r.node.inputs
-        L_in[2].default_value = size * 0.6
-        edge = math_('SUBTRACT', r, v.outputs['Distance'])
-        dot = math_('MULTIPLY', edge, 6.0 / size)
-        dot = math_('MINIMUM', math_('MAXIMUM', dot, 0.0), 1.0)
+        r = math_('MULTIPLY_ADD', sep.outputs['Green'], size * 0.9)
+        r.node.inputs[2].default_value = size * 0.55
+        t = math_('DIVIDE', v.outputs['Distance'], r)
+        spot = math_('SUBTRACT', 1.0, t)
+        spot = math_('MINIMUM', math_('MAXIMUM', math_('DIVIDE', spot, soft), 0.0), 1.0)
         on = math_('LESS_THAN', sep.outputs['Red'], keep)
-        return math_('MULTIPLY', dot, on)
+        return math_('MULTIPLY', spot, on)
 
-    broad = noise(0.7, 3.0)
-    patch = noise(2.4, 5.0, 0.62, distortion=0.4)
-    lace_n = noise(7.0, 6.0, 0.66, distortion=1.1, vec=wc)
-
-    # Base: golden where thin, deeper amber where it browned.
-    base = ramp(broad, [(0.3, '#f6ab50'), (0.52, '#eb9439'), (0.75, '#d57e2c')])
-    amber = ramp(broad, [(0.2, '#bf601c'), (0.8, '#a44f16')])
-    col = mix(base, amber, ramp(patch, [(0.45, 0.0), (0.74, 0.65)]))
-    # Pale golden flecks where the batter bubbled thin.
-    pale = ramp(broad, [(0.0, '#f3bf6e'), (1.0, '#e9ad5c')])
-    col = mix(col, pale, ramp(noise(11.0, 3.0, 0.5, vec=wc), [(0.62, 0.0), (0.7, 0.55)]))
-    # Lace: a fine brown network.
-    lace = ramp(lace_n, [(0.44, 0.0), (0.52, 0.85), (0.6, 0.0)])
-    lace_col = ramp(broad, [(0.0, '#8c3f10'), (1.0, '#74330c')])
-    col = mix(col, lace_col, lace)
-    # Specks: many small, some larger.
-    s1 = specks(4.0, 0.22, 0.85, 0.3)
-    s2 = specks(2.0, 0.15, 0.6, 7.7)
-    s3 = specks(8.0, 0.24, 0.55, 3.3)
-    sp = math_('MAXIMUM', math_('MAXIMUM', s1, s2), s3)
-    dark = ramp(broad, [(0.0, '#5a250a'), (1.0, '#441c07')])
-    col = mix(col, dark, math_('MULTIPLY', sp, 0.92))
+    # Golden crepe, lighter and yellower where it is thin.
+    base = ramp(broad, [(0.28, '#f2a84f'), (0.5, '#e78f3a'), (0.74, '#d6782d')])
+    light = ramp(broad, [(0.0, '#f6bd68'), (1.0, '#efb05a')])
+    col = mix(base, light, ramp(noise(3.2, 4.0, 0.6, vec=wc), [(0.5, 0.0), (0.66, 0.7)]))
+    amber = ramp(broad, [(0.2, '#c96b24'), (0.8, '#b85e1e')])
+    col = mix(col, amber, ramp(patch, [(0.48, 0.0), (0.76, 0.6)]))
+    # The honeycomb of browned pores: orange-brown spots with darker cores.
+    p1 = pits(3.6, 0.46, 0.9, 0.3, soft=0.6)
+    p2 = pits(6.8, 0.46, 0.75, 5.1, soft=0.6)
+    sp = math_('MAXIMUM', p1, p2)
+    pore = ramp(broad, [(0.0, '#b9541a'), (1.0, '#a34816')])
+    col = mix(col, pore, math_('MINIMUM', math_('MULTIPLY', sp, 1.5), 0.92))
+    core_ = ramp(sp, [(0.55, 0.0), (0.98, 0.6)])
+    dark = ramp(broad, [(0.0, '#7a3510'), (1.0, '#652a0b')])
+    col = mix(col, dark, core_)
+    # A faint lace where the batter caught.
+    lace = ramp(noise(7.0, 6.0, 0.66, distortion=1.1, vec=wc), [(0.47, 0.0), (0.52, 0.35), (0.57, 0.0)])
+    col = mix(col, pore, lace)
     L(col, p.inputs['Base Color'])
 
-    # Relief.
+    # Relief: the pores are shallow pits, a soft undulation over all.
     b1 = N('ShaderNodeBump')
-    b1.inputs['Strength'].default_value = 0.45
-    b1.inputs['Distance'].default_value = 0.012
+    b1.inputs['Strength'].default_value = 0.5
+    b1.inputs['Distance'].default_value = 0.02
     b1.invert = True
     L(sp, b1.inputs['Height'])
-    b2 = N('ShaderNodeBump')
-    b2.inputs['Strength'].default_value = 0.25
-    b2.inputs['Distance'].default_value = 0.01
-    L(lace, b2.inputs['Height'])
     b3 = N('ShaderNodeBump')
     b3.inputs['Strength'].default_value = 0.3
     b3.inputs['Distance'].default_value = 0.05
     L(noise(3.0, 6.0, 0.6), b3.inputs['Height'])
-    L(b3.outputs['Normal'], b2.inputs['Normal'])
-    L(b2.outputs['Normal'], b1.inputs['Normal'])
+    L(b3.outputs['Normal'], b1.inputs['Normal'])
     L(b1.outputs['Normal'], p.inputs['Normal'])
-    # Ghee: glossier in patches, matt in the dark specks.
-    rough = ramp(patch, [(0.3, 0.38), (0.75, 0.58)])
-    rough = mix(rough, ramp(sp, [(0.0, 0.7), (1.0, 0.7)]), sp)
+    # Ghee: glossier in patches, matt in the pores.
+    rough = ramp(patch, [(0.3, 0.36), (0.75, 0.55)])
+    rough = mix(rough, ramp(sp, [(0.0, 0.68), (1.0, 0.68)]), sp)
     L(rough, p.inputs['Roughness'])
     p.inputs['Specular IOR Level'].default_value = 0.36
     return m
@@ -375,7 +388,7 @@ def dosa_parcel(name, mat, x, y_front, z_floor, seed):
     B = dims.PIECE_D / 2 * (1 + rnd.uniform(-0.04, 0.02))
     C = dims.PIECE_H / 2 * (1 + rnd.uniform(-0.05, 0.03))
     E = 1.05  # length of each rounded, tucked end
-    ex = 3.5  # section squareness (2 = ellipse)
+    ex = 4.4  # section squareness (2 = ellipse)
     lap = 0.075  # crepe thickness: the step at its outer edge
     seam0 = math.radians(128 + rnd.uniform(-8, 8))  # front shoulder
     bow = rnd.uniform(-0.09, 0.09)
@@ -411,7 +424,7 @@ def dosa_parcel(name, mat, x, y_front, z_floor, seed):
             # just after it, winding down to the layer below all the way round.
             rad = math.hypot(py, pz) or 1e-6
             off = lap * (1 - psi / (2 * math.pi)) + 0.025 * math.exp(-psi / 0.09)  # the loose edge lifts a little
-            wob = 0.05 * noise(Vector((xx * 0.7 + seed * 3.1, py * 0.8, pz * 0.8))) + 0.018 * noise(Vector((xx * 2.6, py * 2.6 + seed, pz * 2.6)))
+            wob = 0.032 * noise(Vector((xx * 0.7 + seed * 3.1, py * 0.8, pz * 0.8))) + 0.018 * noise(Vector((xx * 2.6, py * 2.6 + seed, pz * 2.6)))
             # Folds where the crepe is tucked under at the ends.
             fold = 0.045 * (1 - s) ** 0.8 * math.sin(7 * phi + 2.5 * noise(Vector((xx * 0.4, seed * 1.3, 0.0))))
             f = 1 + (off + wob + fold) / rad
@@ -461,7 +474,7 @@ def pack(ctx, variant, x=0.0, suffix=''):
     inside = m.board('board inside' + suffix, color='#e9e5da', roughness=0.8, coat=0.0, tooth=0.05)
     edge = m.board('board edge' + suffix, color='#d8d0bf', roughness=0.85, coat=0.0, tooth=0.08)
     white = m.board('drawer board' + suffix, color='#f3f2ee', roughness=0.7, coat=0.04, tooth=0.04)
-    foil = m.foil('foil' + suffix)
+    foil = crinkled_foil(ctx, 'foil' + suffix)
     dosa = dosa_material(ctx, 'dosa' + suffix)
 
     objs = [sleeve(f'sleeve{suffix}', art, inside, edge, x=x)]

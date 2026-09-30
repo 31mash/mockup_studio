@@ -1,13 +1,20 @@
-"""A Punjabi samosa sitting on its base: shape in numpy, a procedural
-fried-pastry material.
+"""A Punjabi samosa sitting on its base: shape and blisters in numpy, a
+fried-pastry material that reads them back.
 
-Shape. Horizontal slices are rounded triangles that shrink to the tip: the
-pastry is a cone of dough folded round the filling, so the three faces bulge,
-two corners are soft folds and the third, at the back, is the pinched seam
-where the cone was sealed: a thin crimped fin running up to the tip. At the
-base the corners flatten out into thin crisp feet. Low-frequency lumps (the
-filling pushing through) move the surface; blisters, grain and browning are
-in the shader.
+Shape. Horizontal slices are rounded triangles shrinking to the tip: the
+pastry is a cone of dough folded round the filling, so the three faces fill
+out, the two front corners are soft folds and the third, at the back, is the
+pinched seam where the cone was sealed (a thin crimped fin up to the tip).
+The cone's overlap shows as a faint step running down one face from the tip.
+At the base the corners flatten into thin, crisp feet, one longer than the
+others, and a narrow lip runs round the base where the pastry sat in the oil.
+
+Surface. Deep-fried dough is covered in blisters: a dense field of small
+ones, fewer medium ones and a few big bubbles. They are real geometry
+(domes pushed out along the normal), so the studio light rakes across them
+and the oily coat glints on their tops. The blister height and the folds are
+stored as mesh attributes ('blister', 'edge') for the shader: blister tops
+fry paler and golden, the folds, the seam and the base fry darker.
 """
 
 from __future__ import annotations
@@ -18,9 +25,14 @@ import numpy as np
 
 import dims
 
-NA = 256  # samples round each slice
-NZ = 120  # slices
+NA = 800  # samples round each slice (about 0.35 mm apart at the base)
+NZ = 280  # slices
 TOP = 0.985  # the last ring's height, as a fraction of the samosa's height
+
+CORNERS = (90.0, 210.0, 330.0)  # the seam at the back (+Y), folds front-left and front-right
+CORNER_SCALE = (1.0, 1.07, 0.97)
+FEET = (0.30, 0.95, 0.55)  # how far each corner's foot runs out at the base (cm)
+OVERLAP_AT = 229.0  # the cone's overlap: a faint step down the front face, near the front-left fold
 
 
 def _gauss_smooth(r, sigma_deg):
@@ -50,96 +62,164 @@ def _noise3(seed, n, scale):
 
 _lumps = _noise3(5, 14, 2.6)
 _small = _noise3(9, 18, 0.9)
+_patch = _noise3(17, 10, 1.6)
+
+
+def _hash(c, seed, k):
+    """Uniform [0, 1) per integer cell (N x 3) and stream k."""
+    h = (c[:, 0].astype(np.uint64) * np.uint64(0x9E3779B1)
+         ^ c[:, 1].astype(np.uint64) * np.uint64(0x85EBCA77)
+         ^ c[:, 2].astype(np.uint64) * np.uint64(0xC2B2AE3D)
+         ^ np.uint64((seed * 7919 + k * 104729) & 0xFFFFFFFF))
+    h ^= h >> np.uint64(15)
+    h *= np.uint64(0x2C1B3C6D)
+    h &= np.uint64(0xFFFFFFFFFFFF)
+    h ^= h >> np.uint64(12)
+    h *= np.uint64(0x297A2D39)
+    h &= np.uint64(0xFFFFFFFFFFFF)
+    h ^= h >> np.uint64(15)
+    return (h & np.uint64(0xFFFFFF)).astype(np.float64) / float(0x1000000)
+
+
+def _blisters(P, cell, prob, r0, r1, h0, h1, seed):
+    """Domes of fried dough: one candidate per cell of a jittered 3D grid,
+    kept with probability `prob`, radius r0..r1 and height h0..h1 (cm).
+    Overlapping domes merge (the higher one wins)."""
+    offset = np.array([0.37, 0.61, 0.13]) * seed
+    Q = P / cell + offset
+    g = np.floor(Q).astype(np.int64)
+    best = np.zeros(len(P))
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                c = g + np.array([dx, dy, dz])
+                cc = c + (1 << 20)
+                fp = c + np.stack([_hash(cc, seed, k) for k in range(3)], axis=1)
+                d = np.linalg.norm(Q - fp, axis=1) * cell
+                rad = r0 + (r1 - r0) * _hash(cc, seed, 3)
+                hgt = (h0 + (h1 - h0) * _hash(cc, seed, 4)) * (_hash(cc, seed, 5) < prob)
+                dome = hgt * np.clip(1.0 - (d / rad) ** 2, 0.0, 1.0) ** 0.9
+                best = np.maximum(best, dome)
+    return best
 
 
 def rings():
-    """Vertex rings (NZ x NA x 3), bottom to tip, before placement."""
+    """Vertex rings (NZ x NA x 3) from the base to the tip, before blisters,
+    and per-vertex fold weights (NZ x NA)."""
     R0, H = dims.SAMOSA_R, dims.SAMOSA_H
     th = np.linspace(0, 2 * np.pi, NA, endpoint=False)
-    # Corners: the seam at the back (+Y), soft folds front-left and front-right.
-    corners = np.radians([90.0, 210.0, 330.0])
-    scale = np.array([1.04, 0.97, 1.0])
-    # Distance (deg) to the nearest corner and which one it is.
+    corners = np.radians(CORNERS)
+    scale = np.array(CORNER_SCALE)
+    feet = np.array(FEET)
     dd = np.degrees(np.abs((th[:, None] - corners[None, :] + np.pi) % (2 * np.pi) - np.pi))
     near = np.argmin(dd, axis=1)
     dmin = dd[np.arange(NA), near]
     face = np.radians(60.0 - dmin)  # 0 at a corner, 60 deg at a face centre
     tri = math.cos(math.radians(60)) / np.cos(face)  # 1 at corners, 0.5 mid-face
     seam = near == 0
+    # The cone's overlap: a step (the upper layer's edge) that thins out across the face.
+    rel = (np.degrees(th) - OVERLAP_AT + 180.0) % 360.0 - 180.0
+    overlap = 1.0 / (1.0 + np.exp(-rel / 0.5)) * np.exp(-np.maximum(rel, 0.0) / 14.0)
 
-    zs = np.linspace(0, 1, NZ) ** 1.15 * H * TOP  # denser at the base; the tip is a single point
-    out = []
+    zs = np.linspace(0, 1, NZ) ** 1.2 * H * TOP  # denser at the base; the tip is a single point
+    out, edge = [], []
     for z in zs:
         h = z / H
-        bulge = 0.24 + 0.07 * math.sin(math.pi * min(1.0, h * 1.3))  # faces fill out
+        bulge = 0.2 + 0.1 * math.sin(math.pi * min(1.0, h * 1.25))  # the faces fill out
         r = (1 - bulge) * tri + bulge
         r = r * scale[near]
-        # Round the folds (more so higher up), keep the seam and the feet sharp.
-        soft = _gauss_smooth(r, 3.0 + 4.0 * min(1.0, h * 2.2))
-        sharp = _gauss_smooth(r, 2.2 + 2.0 * h)
+        # Round the folds (more so higher up), keep the seam and the feet crisper.
+        soft = _gauss_smooth(r, 2.6 + 5.0 * min(1.0, h * 2.0))
+        sharp = _gauss_smooth(r, 1.8 + 2.0 * h)
         wsharp = np.where(seam, 1.0, 0.0) * np.exp(-(dmin / 26.0) ** 2)
         r = soft * (1 - wsharp) + sharp * wsharp
-        # Profile up to the tip: slightly convex faces, a rounded point.
-        prof = (1 - h) ** 0.82 * (1 + 0.08 * math.sin(math.pi * h))
+        # Profile to the tip: nearly straight faces, a little fuller low down.
+        prof = (1 - h) ** 0.9 * (1 + 0.1 * math.sin(math.pi * h ** 0.8))
         rr = R0 * r * prof
-        # Base: a tight roll under the edge and flat, flared feet at the corners.
-        rb = 0.3
+        # Base: a tight roll under the edge, a thin lip, and flat feet at the corners.
+        rb = 0.35
         if z < rb:
-            rr = rr - (rb - math.sqrt(max(0.0, rb * rb - (rb - z) ** 2))) * 0.9
-        # A thin crisp lip all round the base, where the pastry edge sits on the plate.
-        rr = rr + 0.2 * math.exp(-z / 0.07)
-        feet = 0.55 * math.exp(-z / 0.17) * np.exp(-(dmin / 11.0) ** 2) * np.where(seam, 0.6, 1.0)
-        rr = rr + feet
+            rr = rr - (rb - math.sqrt(max(0.0, rb * rb - (rb - z) ** 2))) * 0.8
+        rr = rr + 0.16 * math.exp(-z / 0.06)
+        rr = rr + feet[near] * math.exp(-z / 0.14) * np.exp(-(dmin / 12.0) ** 2)
         # The seam fin: pressed pastry standing proud of the back corner, crimped.
         ph = z * 2 * math.pi / 0.9 + 1.3 * math.sin(z * 1.9) + 0.7 * math.sin(z * 4.3 + 1.0)
         pleat = 1 + 0.2 * math.sin(ph) * (0.6 + 0.4 * math.sin(z * 2.7 + 0.4))
-        fin = 0.34 * (1 - h) ** 0.45 * pleat * np.exp(-(dmin / 2.8) ** 2) * seam
-        rr = rr + fin
+        rr = rr + 0.3 * (1 - h) ** 0.45 * pleat * np.exp(-(dmin / 2.8) ** 2) * seam
+        # The overlap step, fading out towards the base and the tip.
+        rr = rr + 0.07 * overlap * min(1.0, z / 0.8) * (1 - h) ** 0.3
         # Lean: the tip sits over the back half, a little off to one side.
-        cx = 0.25 * h ** 1.6
-        cy = 0.9 * h ** 1.4
-        ring = np.stack([cx + rr * np.cos(th), cy + rr * np.sin(th), np.full(NA, z)], axis=1)
-        out.append(ring)
-    P = np.array(out)
-    # Lumps of filling under the pastry, and small ones; nothing moves at the base plane.
+        cx = 0.3 * h ** 1.6
+        cy = 0.75 * h ** 1.4
+        out.append(np.stack([cx + rr * np.cos(th), cy + rr * np.sin(th), np.full(NA, z)], axis=1))
+        fold = np.exp(-(dmin / (7.0 + 5.0 * h)) ** 2) * min(1.0, 0.35 + h)
+        edge.append(np.clip(np.maximum(fold, math.exp(-z / 0.45)), 0.0, 1.0))
+    return np.array(out), np.array(edge)
+
+
+def _normals(P):
+    tu = np.roll(P, -1, axis=1) - np.roll(P, 1, axis=1)
+    tv = np.empty_like(P)
+    tv[1:-1] = P[2:] - P[:-2]
+    tv[0] = P[1] - P[0]
+    tv[-1] = P[-1] - P[-2]
+    n = np.cross(tu, tv)
+    return n / (np.linalg.norm(n, axis=2, keepdims=True) + 1e-12)
+
+
+def surface():
+    """Final rings with lumps and blisters, plus the 'blister' and 'edge' weights."""
+    P, edge = rings()
+    H = dims.SAMOSA_H
+    N = _normals(P)
     flat = P.reshape(-1, 3)
-    centre = np.array([0.0, 0.3, H * 0.3])
-    radial = flat - centre
-    radial[:, 2] *= 0.35
-    radial /= np.linalg.norm(radial, axis=1, keepdims=True) + 1e-9
-    zfac = np.clip(flat[:, 2] / 0.5, 0, 1) * np.clip((H - flat[:, 2]) / 0.8, 0, 1)
-    disp = (0.07 * _lumps(flat) + 0.025 * _small(flat)) * zfac
-    flat += radial * disp[:, None]
-    return P
+    n = N.reshape(-1, 3)
+    z = flat[:, 2]
+    # Fade the relief out at the very base (it sits flat) and near the tip.
+    fade = np.clip(z / 0.12, 0, 1) * np.clip((H - z) / 0.5, 0, 1)
+    lumps = (0.08 * _lumps(flat) + 0.03 * _small(flat)) * np.clip(z / 0.5, 0, 1) * np.clip((H - z) / 0.8, 0, 1)
+    # Blisters are denser where the dough was thinner (patches), sparse on the folds.
+    dense = np.clip(0.55 + 0.9 * _patch(flat), 0.15, 1.0)
+    b = np.maximum.reduce([
+        _blisters(flat, 0.17, 0.9, 0.04, 0.085, 0.012, 0.028, 1) * dense,
+        _blisters(flat, 0.36, 0.5, 0.07, 0.15, 0.028, 0.06, 2) * dense,
+        _blisters(flat, 0.9, 0.22, 0.15, 0.3, 0.045, 0.08, 3),
+    ]) * fade
+    flat = flat + n * (lumps + b)[:, None]
+    blister = np.clip(b / 0.055, 0, 1)
+    return flat.reshape(P.shape), blister.reshape(P.shape[:2]), edge
 
 
 def mesh(name, mat, at=(0.0, 0.0, 0.0)):
     import bpy
 
-    P = rings()
+    P, blister, edge = surface()
     nz, na = P.shape[:2]
     # Bottom cap: concentric rings to the centre so the base stays flat.
-    base = P[0]
+    base = P[0].copy()
+    base[:, 2] = 0.0
     c = base.mean(axis=0)
-    caps = [c + (base - c) * f for f in (0.8, 0.55, 0.3, 0.1)]
+    caps = [c + (base - c) * f for f in (0.85, 0.6, 0.35, 0.12)]
     rows = caps[::-1] + list(P)
+    brow = [np.zeros(na)] * 4 + list(blister)
+    erow = [np.ones(na)] * 4 + list(edge)
     tip = P[-1].mean(axis=0)
     tip[2] = dims.SAMOSA_H
-    verts = [tuple(c)] + [tuple(v) for row in rows for v in row] + [tuple(tip)]
+    V = np.array([c] + [v for row in rows for v in row] + [tip])
+    Bw = np.concatenate([[0.0]] + [r for r in brow] + [[0.0]])
+    Ew = np.concatenate([[1.0]] + [r for r in erow] + [[1.0]])
     nr = len(rows)
-    faces = []
-    for j in range(na):  # centre fan
-        faces.append((0, 1 + (j + 1) % na, 1 + j))
+    idx = np.arange(na)
+    faces = [np.stack([np.zeros(na, int), 1 + (idx + 1) % na, 1 + idx], axis=1)]
+    quads = []
     for r in range(nr - 1):
-        for j in range(na):
-            a = 1 + r * na + j
-            b = 1 + r * na + (j + 1) % na
-            faces.append((a, b, b + na, a + na))
-    tip = len(verts) - 1
+        a = 1 + r * na + idx
+        b = 1 + r * na + (idx + 1) % na
+        quads.append(np.stack([a, b, b + na, a + na], axis=1))
+    quads = np.concatenate(quads)
+    t = len(V) - 1
     last = 1 + (nr - 1) * na
-    for j in range(na):
-        faces.append((last + j, last + (j + 1) % na, tip))
-    V = np.array(verts)
+    tris = [faces[0], np.stack([last + idx, last + (idx + 1) % na, np.full(na, t)], axis=1)]
     # Place: rotate about z, move beside the bag.
     x, y, rot = at
     a = math.radians(rot)
@@ -147,8 +227,11 @@ def mesh(name, mat, at=(0.0, 0.0, 0.0)):
     V = V @ Rm.T + np.array([x, y, 0.0])
     V[:, 2] -= V[:, 2].min()
     me = bpy.data.meshes.new(name)
-    me.from_pydata(V.tolist(), [], faces)
+    me.from_pydata(V.tolist(), [], [tuple(f) for f in tris[0]] + [tuple(f) for f in quads] + [tuple(f) for f in tris[1]])
     me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
+    for key, vals in (('blister', Bw), ('edge', Ew)):
+        at_ = me.attributes.new(key, 'FLOAT', 'POINT')
+        at_.data.foreach_set('value', vals.astype(np.float32))
     me.update()
     ob = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(ob)
@@ -157,16 +240,22 @@ def mesh(name, mat, at=(0.0, 0.0, 0.0)):
 
 
 def material(m):
-    """Deep-fried pastry: golden brown, deeper on the folds, the seam and the
-    base; covered in small raised blisters (paler on top, browner between);
-    a few carom seeds; a light oily sheen."""
+    """Deep-fried pastry: golden brown with broad darker patches; blister tops
+    paler, folds, seam and base fried darker; a few carom seeds; an oily coat
+    that glints on the blisters."""
     from studio.core import rgba
 
-    mat = m.solid('samosa', '#b77a3c', roughness=0.5)
+    mat = m.solid('samosa', '#a8652c', roughness=0.5)
     nt = mat.node_tree
     N, Lk = nt.nodes, nt.links
     p = N['Principled BSDF']
     obj = N.new('ShaderNodeTexCoord').outputs['Object']
+
+    def attr(name):
+        a = N.new('ShaderNodeAttribute')
+        a.attribute_type = 'GEOMETRY'
+        a.attribute_name = name
+        return a.outputs['Fac']
 
     def op(kind, a, b=None, clamp=False):
         n = N.new('ShaderNodeMath')
@@ -206,79 +295,78 @@ def material(m):
     def ramp01(x, lo, hi):  # (x - lo) / (hi - lo), clamped
         return op('MULTIPLY', op('SUBTRACT', x, lo), 1.0 / (hi - lo), clamp=True)
 
-    # Wobbled coordinates, so blisters are irregular rather than round.
+    bl = attr('blister')
+    edge = attr('edge')
+
+    # Colour: golden brown, broad deeper patches and a finer mottle.
+    col = mix(ramp01(noise(0.45, 3.0), 0.35, 0.65), '#b66a24', '#96521d')
+    col = mix(op('MULTIPLY', ramp01(noise(2.2, 4.0), 0.5, 0.7), 0.45), col, '#83431a')
+    # Soft pale patches, where the dough fried lighter.
+    col = mix(op('MULTIPLY', ramp01(noise(0.32, 2.0), 0.52, 0.72), 0.55), col, '#cd9751')
+    # Folds, the seam, the tip and the base fry darker.
+    col = mix(op('MULTIPLY', op('POWER', edge, 1.3), 0.75), col, '#6c3411')
+    # Blister tops fry paler and golden.
+    col = mix(op('MULTIPLY', bl, 0.4), col, '#c78e48')
+    col = mix(op('MULTIPLY', ramp01(noise(9.0, 3.0), 0.45, 0.7), 0.3), col, '#86461a')
+    # Bubbles all over: small pale specks, and finer ones (also in the bump below).
+    def specks(scale, r0, r1, keep):
+        v = N.new('ShaderNodeTexVoronoi')
+        v.inputs['Scale'].default_value = scale
+        Lk.new(warped.outputs['Vector'], v.inputs['Vector'])
+        pick = N.new('ShaderNodeSeparateColor')
+        Lk.new(v.outputs['Color'], pick.inputs['Color'])
+        size = op('ADD', r0, op('MULTIPLY', pick.outputs[0], r1 - r0))
+        dome = op('SUBTRACT', 1.0, op('DIVIDE', v.outputs['Distance'], size), clamp=True)
+        dome = op('MULTIPLY', dome, op('GREATER_THAN', pick.outputs[1], 1.0 - keep))
+        return op('MULTIPLY', op('POWER', dome, 0.5), op('SUBTRACT', 1.0, op('MULTIPLY', edge, 0.6)))
+
     wob = N.new('ShaderNodeTexNoise')
-    wob.inputs['Scale'].default_value = 3.0
+    wob.inputs['Scale'].default_value = 6.0
     wob.inputs['Detail'].default_value = 2.0
     Lk.new(obj, wob.inputs['Vector'])
     wv = N.new('ShaderNodeVectorMath')
     wv.operation = 'SCALE'
-    wv.inputs['Scale'].default_value = 0.09
+    wv.inputs['Scale'].default_value = 0.05
     Lk.new(wob.outputs['Color'], wv.inputs[0])
     warped = N.new('ShaderNodeVectorMath')
     warped.operation = 'ADD'
     Lk.new(obj, warped.inputs[0])
     Lk.new(wv.outputs['Vector'], warped.inputs[1])
-
-    def blisters(scale, r0, r1):
-        v = N.new('ShaderNodeTexVoronoi')
-        v.feature = 'F1'
-        v.inputs['Scale'].default_value = scale
-        Lk.new(warped.outputs['Vector'], v.inputs['Vector'])
-        size = N.new('ShaderNodeSeparateColor')
-        Lk.new(v.outputs['Color'], size.inputs['Color'])
-        rad = op('ADD', op('MULTIPLY', size.outputs[0], r1 - r0), r0)
-        dome = op('SUBTRACT', 1.0, op('DIVIDE', v.outputs['Distance'], rad), clamp=True)
-        return op('POWER', dome, 0.45), size.outputs[1]
-
-    geo = N.new('ShaderNodeNewGeometry')
-    sep = N.new('ShaderNodeSeparateXYZ')
-    Lk.new(geo.outputs['Position'], sep.inputs['Vector'])
-
-    big, pick = blisters(2.8, 0.12, 0.5)
-    small, _ = blisters(8.0, 0.2, 0.5)
-    cluster = ramp01(noise(0.8, 2.0), 0.36, 0.6)
-    bl = op('MAXIMUM', op('MULTIPLY', big, cluster), op('MULTIPLY', small, 0.55))
-    grain = noise(30.0, 6.0, 0.6)
-    height = op('ADD', bl, op('MULTIPLY', grain, 0.25))
-
-    # Colour: golden with broad browner patches and a finer mottle.
-    col = mix(op('MULTIPLY', ramp01(noise(0.55, 4.0), 0.38, 0.64), 0.7), '#d99a50', '#a8642a')
-    col = mix(op('MULTIPLY', ramp01(noise(1.8, 3.0), 0.48, 0.66), 0.45), col, '#8f5024')
-    # Folds, seam and tip brown deeper; so does the base, where it sat in the oil.
-    edge = ramp01(geo.outputs['Pointiness'], 0.51, 0.56)
-    col = mix(op('MULTIPLY', edge, 0.9), col, '#6e3a12')
-    low = op('SUBTRACT', 1.0, ramp01(sep.outputs['Z'], 0.05, 0.6))
-    col = mix(op('MULTIPLY', low, 0.65), col, '#6d3a16')
-    # Blisters: most with pale tops, some fried a deeper brown; browner hollows between.
-    tone = mix(op('GREATER_THAN', pick, 0.7), '#e8b56c', '#7c4015')
-    col = mix(op('MULTIPLY', op('POWER', bl, 1.5), 0.6), col, tone)
-    col = mix(op('MULTIPLY', op('SUBTRACT', 1.0, bl), 0.2), col, '#7f4518')
+    speck = op('MAXIMUM', specks(3.6, 0.14, 0.34, 0.6), op('MULTIPLY', specks(8.0, 0.18, 0.4, 0.5), 0.7))
+    col = mix(op('MULTIPLY', speck, 0.7), col, '#dcb06c')
     # A few carom seeds.
     seeds = N.new('ShaderNodeTexVoronoi')
-    seeds.inputs['Scale'].default_value = 3.1
+    seeds.inputs['Scale'].default_value = 2.6
     Lk.new(obj, seeds.inputs['Vector'])
-    sd = op('LESS_THAN', seeds.outputs['Distance'], 0.05)
+    sd = op('LESS_THAN', seeds.outputs['Distance'], 0.045)
     which = N.new('ShaderNodeSeparateColor')
     Lk.new(seeds.outputs['Color'], which.inputs['Color'])
-    sd = op('MULTIPLY', sd, op('GREATER_THAN', which.outputs[2], 0.6))
-    col = mix(op('MULTIPLY', sd, 0.8), col, '#3b2414')
+    sd = op('MULTIPLY', sd, op('GREATER_THAN', which.outputs[2], 0.72))
+    col = mix(op('MULTIPLY', sd, 0.85), col, '#3a2210')
     Lk.new(col, p.inputs['Base Color'])
 
+    # Fine texture on top of the geometric blisters: pinprick bubbles and grain.
+    micro = N.new('ShaderNodeTexVoronoi')
+    micro.inputs['Scale'].default_value = 22.0
+    Lk.new(obj, micro.inputs['Vector'])
+    pin = op('SUBTRACT', 1.0, ramp01(micro.outputs['Distance'], 0.0, 0.42))
+    height = op('ADD', op('ADD', op('MULTIPLY', op('POWER', pin, 2.0), 0.3), op('MULTIPLY', noise(45.0, 6.0, 0.6), 0.3)),
+                speck)
     bump = N.new('ShaderNodeBump')
-    bump.inputs['Strength'].default_value = 1.0
-    bump.inputs['Distance'].default_value = 0.07
+    bump.inputs['Strength'].default_value = 0.5
+    bump.inputs['Distance'].default_value = 0.012
     Lk.new(height, bump.inputs['Height'])
     Lk.new(bump.outputs['Normal'], p.inputs['Normal'])
     Lk.new(bump.outputs['Normal'], p.inputs['Coat Normal'])
 
-    # Oil: a light sheen, glossier in patches.
-    rough = op('ADD', 0.3, op('MULTIPLY', noise(1.3, 3.0), 0.34))
+    # Oil: blister tops and glossy patches are slicker.
+    rough = op('SUBTRACT', op('ADD', 0.5, op('MULTIPLY', noise(1.3, 3.0), 0.2)), op('MULTIPLY', bl, 0.18))
     Lk.new(rough, p.inputs['Roughness'])
-    p.inputs['Specular IOR Level'].default_value = 0.5
-    p.inputs['Coat Weight'].default_value = 0.22
-    p.inputs['Coat Roughness'].default_value = 0.32
-    p.inputs['Subsurface Weight'].default_value = 0.05
+    p.inputs['Specular IOR Level'].default_value = 0.4
+    p.inputs['Coat Weight'].default_value = 0.16
+    p.inputs['Coat Roughness'].default_value = 0.22
+    p.inputs['Coat IOR'].default_value = 1.47
+    p.inputs['Subsurface Weight'].default_value = 0.06
     p.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.2)
     p.inputs['Subsurface Scale'].default_value = 0.1
     return mat

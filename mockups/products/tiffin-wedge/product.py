@@ -280,7 +280,10 @@ def film(name, mat):
         grid.append(row)
     for i in range(npp):
         for j in range(nx):
-            f = bm.faces.new([grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]])
+            # Wound so the normal faces out of the pack: seen from its back,
+            # the Fresnel node inverts the IOR and the film turns into a
+            # grey mirror (total internal reflection) at grazing angles.
+            f = bm.faces.new([grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]])
             f.smooth = True
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)

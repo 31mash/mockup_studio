@@ -79,7 +79,7 @@ def _body(s, mt, outline, top_z, open_top=False):
 
 
 def _lid(s, mt, outline, z0, inside=False):
-    """The lid shell from its rolled edge (z0) to its top, and the roll."""
+    """The lid shell from its bottom edge (z0) to its top, and the roll below it."""
     top = z0 + dims.LID_H - dims.LID_GAP
     lid = s.walled_shell(
         'gadget-tin-lid',
@@ -91,16 +91,16 @@ def _lid(s, mt, outline, z0, inside=False):
         top_extent=(dims.W, dims.D),
         cap_bottom=False,
     )
-    # The roll: its outside a hair proud of the lid wall, the wall's cut edge
-    # hidden inside it.
-    lip = s.torus_ring('gadget-tin-lid-lip', s.inset(outline, dims.LIP_R - 0.012), z0 + dims.LIP_R * 0.35, dims.LIP_R, mt['tin'])
+    # The roll hangs just below the lid wall, a little proud of it, and hides
+    # the wall's cut edge: the silver line of the photo.
+    lip = s.torus_ring('gadget-tin-lid-lip', s.inset(outline, dims.LIP_R - 0.03), z0 - dims.LIP_R * 0.3, dims.LIP_R, mt['tin'])
     parts = [lid, lip]
     if inside:
         parts.append(
             s.walled_shell(
                 'gadget-tin-lid-inside',
                 s.inset(outline, SHEET),
-                z0 + dims.LIP_R,
+                z0,
                 top - SHEET,
                 top_radius=dims.LID_EDGE - SHEET,
                 mats=(mt['inside'], mt['inside'], None, mt['inside']),
@@ -139,7 +139,7 @@ def _open(s, mt, outline):
     rim = s.torus_ring('gadget-tin-rim', s.inset(body_outline, SHEET / 2), rim_z, 0.06, mt['tin'])
 
     # The lid, resting on its rolled edge.
-    lid_parts = _lid(s, mt, outline, dims.LIP_R * 0.65, inside=True)
+    lid_parts = _lid(s, mt, outline, dims.LIP_R * 1.3, inside=True)
 
     # Body a little left of centre, lid to its right and slightly behind,
     # turned a touch so the pair doesn't look lined up.

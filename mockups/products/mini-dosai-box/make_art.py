@@ -35,8 +35,8 @@ VARIANTS = {
         badge_text=['Chicken', 'kurma and', 'coconut', 'chutney'],
         name='Chicken',
         mark=nonveg_mark,
-        blurb='Crisp mini dosai, rolled around a spiced chicken kurma.',
-        ingredients='Rice, black gram, chicken, onion, coconut, curry leaves, oil, spices.',
+        blurb=['Crisp mini dosai, folded round', 'a spiced chicken kurma.'],
+        ingredients=['Rice, black gram, chicken, onion, coconut,', 'curry leaves, sunflower oil, spices.'],
     ),
     'veg': dict(
         ink='#20552d',
@@ -44,8 +44,8 @@ VARIANTS = {
         badge_text=['Aloo', 'podimas and', 'coconut', 'chutney'],
         name='Vegetarian',
         mark=veg_mark,
-        blurb='Crisp mini dosai, rolled around a potato podimas.',
-        ingredients='Rice, black gram, potato, onion, coconut, curry leaves, oil, spices.',
+        blurb=['Crisp mini dosai, folded round', 'a lightly spiced potato podimas.'],
+        ingredients=['Rice, black gram, potato, onion, coconut,', 'curry leaves, sunflower oil, spices.'],
     ),
 }
 
@@ -144,27 +144,32 @@ def bottom(v, w, h):
     cx = w / 2
     out = [ticket_frame(54, 64, w - 54, h - 54, 50, 6, ink, 5)]
     out.append(f'<text x="{cx}" y="190" font-family="{SLAB}" font-size="62" text-anchor="middle" fill="{ink}">MINI DOSAI</text>')
-    out.append(f'<text x="{cx}" y="250" font-family="Libre Baskerville" font-style="italic" font-size="28" text-anchor="middle" fill="{ink}">{v["blurb"]}</text>')
+    for i, line in enumerate(v['blurb']):
+        out.append(f'<text x="{cx}" y="{250 + i * 36}" font-family="Libre Baskerville" font-style="italic" font-size="26" text-anchor="middle" fill="{ink}">{line}</text>')
     rows = [
         ('Ingredients', v['ingredients']),
-        ('Storage', 'Keep chilled. Heat on board and serve warm.'),
-        ('Allergens', 'Contains mustard. Made in a kitchen that handles nuts.'),
+        ('Storage', ['Keep chilled. Heat on board and serve warm.']),
+        ('Allergens', ['Contains mustard. Made in a kitchen', 'that also handles nuts.']),
     ]
-    y = 360
-    for k, t in rows:
+    y = 380
+    for k, lines in rows:
         out.append(f'<text x="120" y="{y}" font-family="Libre Baskerville" font-weight="700" font-size="24" fill="{ink}">{k}</text>')
-        out.append(f'<text x="120" y="{y + 36}" font-family="Libre Baskerville" font-size="22" fill="{INK}">{t}</text>')
-        y += 110
+        for i, t in enumerate(lines):
+            out.append(f'<text x="120" y="{y + 36 + i * 31}" font-family="Libre Baskerville" font-size="22" fill="{INK}">{t}</text>')
+        y += 72 + 31 * len(lines)
     # Nutrition box.
-    out.append(f'<rect x="120" y="{y}" width="{w - 240}" height="300" fill="none" stroke="{ink}" stroke-width="3"/>')
+    y += 6
+    out.append(f'<rect x="120" y="{y}" width="{w - 240}" height="262" fill="none" stroke="{ink}" stroke-width="3"/>')
     out.append(f'<text x="140" y="{y + 44}" font-family="Libre Baskerville" font-weight="700" font-size="24" fill="{ink}">Nutrition, per 100 g</text>')
     facts = [('Energy', '212 kcal'), ('Protein', '6.1 g'), ('Carbohydrate', '28.4 g'), ('Fat', '8.2 g'), ('Sodium', '390 mg')]
     for i, (k, t) in enumerate(facts):
-        yy = y + 96 + i * 42
+        yy = y + 88 + i * 38
         out.append(f'<text x="140" y="{yy}" font-family="Libre Baskerville" font-size="22" fill="{INK}">{k}</text>')
         out.append(f'<text x="{w - 140}" y="{yy}" font-family="Libre Baskerville" font-size="22" text-anchor="end" fill="{INK}">{t}</text>')
-    out.append(v['mark'](cx - 40, L - 330, 80))
-    out.append(plane_svg(cx, L - 170, 120, color=ink, dot=0.32))
+    # Food mark and the IndiGo plane, side by side under the box.
+    yb = y + 262 + 70
+    out.append(v['mark'](cx - 150, yb, 72))
+    out.append(plane_svg(cx + 70, yb + 36, 118, color=ink, dot=0.32))
     return ''.join(out)
 
 

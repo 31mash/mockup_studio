@@ -26,13 +26,14 @@ import dims  # noqa: E402
 
 U = 100  # units per cm
 
-# Print colours: the tins sampled from the photo's lit lid tops; the inks are
-# the photo's darkest stroke colours, lifted by the few levels the lit lid
-# tops sit below the flat tin colours.
+# Print colours: the tins sampled from the photo's lit lid tops. The inks are
+# set so that, under the studio's satin lacquer (whose sheen lifts dark inks
+# by about 0.03 in linear light), the lettering renders at the photo's stroke
+# colours: blue about (50, 88, 138), crimson about (162, 48, 74).
 FLAVOURS = {
-    'chocolate-chip': dict(tin='#91d5ea', ink='#175e98', lines=(['Chocolate chip'], ['cookies'])),
+    'chocolate-chip': dict(tin='#91d5ea', ink='#084c88', lines=(['Chocolate chip'], ['cookies'])),
     # The photo sets the plus tight: narrow gaps, not word spaces.
-    'oatmeal-honey': dict(tin='#e27a9e', ink='#aa234b', lines=(['Oatmeal', '+', 'Honey'], ['cookies'])),
+    'oatmeal-honey': dict(tin='#e27a9e', ink='#a00a3c', lines=(['Oatmeal', '+', 'Honey'], ['cookies'])),
 }
 PLUS_GAP = 0.13  # em, either side of the '+'
 SENTENCE = 'For the first time in the history of aviation, IndiGo presents reusable cookie tins. Enjoy.'

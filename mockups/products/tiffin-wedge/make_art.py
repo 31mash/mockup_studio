@@ -204,12 +204,12 @@ def back_panel(v):
     name, paras, lead = STORIES[v['story']]
     m = 28
     out = [f'<rect x="-40" y="-40" width="{FW + 80}" height="{BL + 80}" fill="{v["back"]}"/>']
-    out.append(text(FW / 2, 124, 'Easy to digest', 88, INK, 400, 'middle', 'letter-spacing="-0.5"'))
-    out.append(text(FW / 2, 212, 'stories', 60, INK, 400, 'middle'))
+    out.append(text(FW / 2, 140, 'Easy to digest', 88, INK, 400, 'middle', 'letter-spacing="-0.5"'))
+    out.append(text(FW / 2, 217, 'stories', 60, INK, 400, 'middle'))
     rule = lambda y: f'<rect x="{m}" y="{y - 2}" width="{FW - 2 * m}" height="4" fill="{INK}"/>'  # noqa: E731
-    out.append(rule(240))
-    out.append(text(FW / 2, 300, name, 46, INK, 400, 'middle'))
-    out.append(rule(334))
+    out.append(rule(244))
+    out.append(text(FW / 2, 302, name, 46, INK, 400, 'middle'))
+    out.append(rule(336))
     body = ''.join(f'<p style="margin:0 0 9px 0">{esc(p)}</p>' for p in paras)
     out.append(
         f'<foreignObject x="{m + 3}" y="{358}" width="{FW - 2 * m - 3}" height="{BL - 358}">'

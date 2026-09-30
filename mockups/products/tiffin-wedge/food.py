@@ -49,7 +49,7 @@ def build(name, to_world, p_range, d0, mats, seed=7):
     """The cut-face sheet. mats: dict layer -> material. Returns (sheet, kernels)."""
     p0, p1 = p_range
     pm = (p0 + p1) / 2
-    rows = int((p1 - p0) / 0.06)
+    rows = int((p1 - p0) / 0.045)
     tilt = 0.055  # the halves lean a few degrees in the pack
 
     # Boundary functions x_k(p).
@@ -60,9 +60,9 @@ def build(name, to_world, p_range, d0, mats, seed=7):
         # Chutney is spread by hand: its edges wander and are ragged where
         # kernels push into the bread.
         ragged = 'filling' in (lname, prev)
-        fine = 0.024 if ragged else 0.006
+        fine = 0.02 if ragged else 0.006
         w = _waves(seed * 31 + k, wobble, (7.5, 3.1, 1.6) if ragged else (7.5, 3.1)) if wobble else (lambda p: 0.0)
-        f = _waves(seed * 57 + k, fine, (0.9, 0.55, 0.31, 0.19) if ragged else (0.9, 0.55))
+        f = _waves(seed * 57 + k, fine, (0.9, 0.55, 0.37, 0.27) if ragged else (0.9, 0.55))
         edge = k in (0, len(LAYERS) - 1)
         bounds.append((lambda p, x0=x0, w=w, f=f, edge=edge: x0 if edge else x0 - tilt * (p - pm) + w(p) + f(p)))
 
@@ -118,6 +118,10 @@ def build(name, to_world, p_range, d0, mats, seed=7):
                 co = loop.vert.co
                 loop[uv].uv = (co.x, co.y + co.z)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    # The cut face must face the window (out of the pack).
+    out_dir = Vector(to_world(0.0, p0, 0.0)) - Vector(to_world(0.0, p0, 1.0))
+    if sum((f.normal for f in bm.faces), Vector()).dot(out_dir) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()

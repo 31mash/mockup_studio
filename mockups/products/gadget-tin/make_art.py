@@ -267,9 +267,9 @@ def scissors():
         + ELL(-98, 34, 40, 27)
         + ELL(-98, 34, 26, 14, BL)
         + P('M -74 -52 C -52 -36 -30 -20 0 -17 L 0 17 C -30 20 -52 36 -74 52 L -62 14 L -62 -14 Z')
-        + P('M -8 -17 L 184 -4 Q 192 0 184 4 L -8 17 Z')
+        + P('M -8 -22 L 184 -5 Q 193 0 184 5 L -8 22 Z')
         + KO('M 12 0 L 176 0', w=3.5)
-        + C(0, 0, 7, BL)
+        + C(0, 0, 8, BL)
     )
 
 
@@ -408,7 +408,7 @@ def lid_top():
         'IndiGo’s 2nd reusable tin for the 2nd time',
         'in aviation history.',
     ]
-    text = ''.join(TXT(630, 84 + i * 35.5, s, 26.5, fill=WH, weight=700, anchor='start', spacing=0) for i, s in enumerate(lines))
+    text = ''.join(TXT(630, 72 + i * 36.5, s, 26.5, fill=WH, weight=700, anchor='start', spacing=0) for i, s in enumerate(lines))
     icons = (
         g(swiss_knife(), 162, 326)
         + g(binder_clip(), 462, 206)
@@ -418,8 +418,8 @@ def lid_top():
         + g(pocket_watch(), 800, 458)
         + g(sharpener(), 1074, 306)
         + g(spinning_top(), 1056, 530)
-        + g(nail(), 1208, 440)
-        + g(key(), 790, 688)
+        + g(nail(), 1200, 440)
+        + g(key(), 776, 688)
     )
     return f'<rect width="{W}" height="{D}" fill="{BL}"/>' + icons + text
 
@@ -455,32 +455,32 @@ def body_side():
     # front-left corner, the hair grip's bend just round it; the battery and
     # the pin's head reach the front-right corner.
     front = (
-        place(ipod_shuffle(), 3.25, 2.9)
-        + place(paper_clip(), 3.98, 2.67)
-        + place(battery(), 4.75, 3.18)
-        + place(bobby_pin(), -0.44, 0.85)
-        + place(dice(), 5.5, 1.06)
-        + place(safety_pin(), 6.75, 1.06)
+        place(ipod_shuffle(), 3.25, 3.04)
+        + place(paper_clip(), 3.98, 2.80)
+        + place(battery(), 4.75, 3.34)
+        + place(bobby_pin(), -0.44, 0.89)
+        + place(dice(), 5.5, 1.11)
+        + place(safety_pin(), 6.75, 1.11)
     )
     right = (
-        place(sd_card(), rc - 2.05, 3.2)
-        + place(sewing_button(), rc - 0.1, 3.25)
-        + place(push_pin(), rc + 1.8, 3.2)
-        + place(tape_measure(), rc - 1.95, 1.08)
-        + place(torch(), rc + 1.05, 1.1)
+        place(sd_card(), rc - 2.05, 3.36)
+        + place(sewing_button(), rc - 0.1, 3.41)
+        + place(push_pin(), rc + 1.8, 3.36)
+        + place(tape_measure(), rc - 1.95, 1.13)
+        + place(torch(), rc + 1.05, 1.16)
     )
     back = (
-        place(camera(), bc - 3.3, 3.2)
-        + place(mobile_phone(), bc - 0.35, 3.2)
-        + place(calculator(), bc + 1.85, 3.2)
-        + place(spool(), bc + 4.05, 3.2)
-        + place(ballpoint(), bc - 4.6, 1.1)
-        + place(needle(), bc + 2.65, 1.1)
+        place(camera(), bc - 3.3, 3.36)
+        + place(mobile_phone(), bc - 0.35, 3.36)
+        + place(calculator(), bc + 1.85, 3.36)
+        + place(spool(), bc + 4.05, 3.36)
+        + place(ballpoint(), bc - 4.6, 1.16)
+        + place(needle(), bc + 2.65, 1.16)
     )
     left = (
-        place(pocket_compass(), lc - 1.75, 3.0)
-        + place(scissors(), lc + 0.8, 3.15)
-        + place(pencil(), lc - 2.75, 0.98)
+        place(pocket_compass(), lc - 1.75, 3.15)
+        + place(scissors(), lc + 0.8, 3.31)
+        + place(pencil(), lc - 2.75, 1.03)
     )
     content = front + right + back + left
     # The strip is a loop: draw it again one length either side so icons that

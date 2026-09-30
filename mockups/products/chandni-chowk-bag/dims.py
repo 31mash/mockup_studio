@@ -21,6 +21,7 @@ EDGE_Z = 0.26  # the folded edges ride this far off the floor
 BELLY = 0.22  # fraction of the half-width over which the back panel reaches the floor
 
 # ---------------------------------------------------------------- the samosa
-SAMOSA_R = 4.7  # base: distance from the centre to a corner
-SAMOSA_H = 7.3  # to the tip
-SAMOSA_AT = (-12.6, -4.2, 29.0)  # x, y, rotation (deg): in the hero a fold faces the lens, the seam is the left edge
+SAMOSA_R = 5.0  # base: distance from the centre to a corner (sides about 8.7 cm)
+SAMOSA_H = 6.3  # to the tip
+SAMOSA_AT = (-13.4, -4.0, 10.0)  # x, y, rotation (deg): in the hero the front-left fold is just left of the lens,
+#   so one broad face turns to the key light and the other falls into shade; the seam is at the back
