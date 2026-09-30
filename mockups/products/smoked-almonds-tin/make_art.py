@@ -26,7 +26,7 @@ S = 2 * dims.R * U  # the lid-top image spans the lid's full width
 C = S / 2
 
 BLACK = '#141519'  # print black
-BRONZE = '#b0875a'  # metallic bronze ink (its colour when it reflects white)
+BRONZE = '#bd935f'  # metallic bronze ink (its colour when it reflects white)
 
 # Title in IndiGo's rounded lettering (Comfortaa SemiBold, with IndiGo's arched
 # capital A drawn in), two left-aligned lines running up to the right.

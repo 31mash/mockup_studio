@@ -78,7 +78,7 @@ def _smoothstep(e0, e1, x):
     return t * t * (3 - 2 * t)
 
 
-def napkin(seed: int = 1, loft: float = 0.1):
+def napkin(seed: int = 1, loft: float = 0.14):
     """The folded napkin: vertices (rows, cols, 3) in cm, centred on the
     origin, front edge at -Y, bottom face resting on z = 0 once solidified,
     and UVs (rows, cols, 2) over the unfolded sheet."""
@@ -120,9 +120,20 @@ def napkin(seed: int = 1, loft: float = 0.1):
     frac = np.clip(z / (3 * L), 0.0, 1.0)
     to_right = W / 2 - X
     edge_f = _smoothstep(0.0, 4.5, D / 2 - Y) * _smoothstep(0.0, 2.5, to_right) * (0.6 + 0.4 * _smoothstep(0.0, 13.0, to_right))
-    ph = rng.uniform(0, 2 * math.pi, 4)
-    swell = 0.5 + 0.25 * np.sin(X * 0.42 + ph[0]) * np.cos(Y * 0.5 + ph[1]) + 0.25 * np.sin(X * 0.9 + Y * 0.7 + ph[2])
-    z = z + frac * loft * edge_f * (0.55 + 0.45 * swell)
+    ph = rng.uniform(0, 2 * math.pi, 8)
+    swell = (
+        0.5
+        + 0.22 * np.sin(X * 0.42 + ph[0]) * np.cos(Y * 0.5 + ph[1])
+        + 0.16 * np.sin(X * 0.95 + Y * 0.6 + ph[2])
+        + 0.12 * np.sin(X * 1.7 - Y * 1.1 + ph[4])
+    )
+    z = z + frac * loft * edge_f * (0.3 + 0.7 * swell)
+
+    # The flap's free edge lifts a little off the base (only the flap layers,
+    # measured from their own edge, so the top one always stays on top).
+    in_flap = (V.reshape(-1) > D + 1.0).astype(float)
+    from_edge = SH - V.reshape(-1)
+    z = z + in_flap * 0.09 * _smoothstep(1.6, 0.0, from_edge) * (0.7 + 0.3 * np.sin(X * 0.6 + ph[5]))
 
     # The loose corner at the front left lifts off the table a little.
     corner = _smoothstep(4.0, 0.0, np.hypot(X + W / 2, Y + D / 2)) ** 2

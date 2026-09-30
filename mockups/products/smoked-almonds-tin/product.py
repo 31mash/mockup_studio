@@ -22,6 +22,7 @@ SHOTS = [
 ]
 
 BLACK = '#141519'  # the print black of the artwork
+SATIN = dict(roughness=0.46, coat=0.08)  # deep matte black: a low-sheen lacquer
 
 
 def lid_top_material(ctx):
@@ -29,17 +30,18 @@ def lid_top_material(ctx):
     ink mask (lid-ink.png, white where the bronze prints) turns metallic on
     and roughness down under the ink only."""
     m = ctx.mat
-    mat = m.printed_metal('lid top', art=ctx.art('lid-top.png'), roughness=0.42, coat=0.12)
+    mat = m.printed_metal('lid top', art=ctx.art('lid-top.png'), **SATIN)
     nt = mat.node_tree
     p = nt.nodes['Principled BSDF']
+    p.inputs['Specular IOR Level'].default_value = 0.22
     mask = nt.nodes.new('ShaderNodeTexImage')
     mask.image = m.image(ctx.art('lid-ink.png'), alpha=False, colorspace='Non-Color')
     mask.interpolation = 'Cubic'
     mask.extension = 'EXTEND'
     nt.links.new(mask.outputs['Color'], p.inputs['Metallic'])
     rough = nt.nodes.new('ShaderNodeMapRange')
-    rough.inputs['To Min'].default_value = 0.42
-    rough.inputs['To Max'].default_value = 0.3
+    rough.inputs['To Min'].default_value = SATIN['roughness']
+    rough.inputs['To Max'].default_value = 0.28
     nt.links.new(mask.outputs['Color'], rough.inputs['Value'])
     nt.links.new(rough.outputs['Result'], p.inputs['Roughness'])
     return mat
@@ -48,7 +50,8 @@ def lid_top_material(ctx):
 def build(ctx):
     m, s = ctx.mat, ctx.shapes
     R = dims.R
-    black = m.printed_metal('black', color=BLACK, roughness=0.42, coat=0.12)
+    black = m.printed_metal('black', color=BLACK, **SATIN)
+    black.node_tree.nodes['Principled BSDF'].inputs['Specular IOR Level'].default_value = 0.22
     top = lid_top_material(ctx)
     silver = m.bare_metal()
 

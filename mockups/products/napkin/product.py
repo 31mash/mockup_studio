@@ -45,8 +45,8 @@ def napkin_material(ctx):
     uv.uv_map = 'UVMap'
     nt.links.new(uv.outputs['UV'], tex.inputs['Vector'])
     emb = nt.nodes.new('ShaderNodeBump')
-    emb.inputs['Strength'].default_value = 0.55
-    emb.inputs['Distance'].default_value = 0.012
+    emb.inputs['Strength'].default_value = 1.0
+    emb.inputs['Distance'].default_value = 0.04
     nt.links.new(tex.outputs['Color'], emb.inputs['Height'])
     nt.links.new(emb.outputs['Normal'], grain.inputs['Normal'])
     _ = bpy
