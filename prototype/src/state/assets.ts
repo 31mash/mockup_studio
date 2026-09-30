@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { findModel } from '../domain/models';
 import { blobToCanvas, canvasToBlob } from '../engine/canvas';
+import type { ModelView } from '../domain/angles';
+import { angleInput, requestAngle } from '../engine/generative';
 import { drawStandIn } from '../engine/standins';
 import { prepareSubject, type PreparedSubject } from '../engine/subject';
 import { getBlob, putBlob } from '../storage/db';
@@ -80,8 +82,36 @@ export async function subjectFor(id: string): Promise<PreparedSubject> {
   return prepared;
 }
 
+const views = new Map<string, Promise<PreparedSubject>>();
+/** Bump when angleInput changes, so stored views are made again. */
+const VIEW_VERSION = 1;
+
+/**
+ * A new view of a source from the camera-angle model, cut out and ready to
+ * place. Each view is generated once per source, angle and seed, and kept on
+ * this device, so retries and reloads don't spend GPU time again.
+ */
+export function generatedSubject(sourceId: string, source: PreparedSubject, view: ModelView, seed: number, person: boolean, signal: AbortSignal): Promise<PreparedSubject> {
+  const key = `view:v${VIEW_VERSION}:${sourceId}:${view.azimuth}:${view.elevation}:${seed}`;
+  const hit = views.get(key);
+  if (hit) return hit;
+  const made = (async () => {
+    let blob = await getBlob(key).catch(() => undefined);
+    if (!blob) {
+      const input = await angleInput(source, person);
+      blob = (await requestAngle(input.blob, view, input, seed, signal)).blob;
+      await putBlob(key, blob).catch(() => undefined);
+    }
+    return prepareSubject(await blobToCanvas(blob, 2000));
+  })();
+  views.set(key, made);
+  made.catch(() => views.delete(key));
+  return made;
+}
+
 export function forgetAll(): void {
   urls.forEach((u) => URL.revokeObjectURL(u));
   urls.clear();
   subjects.clear();
+  views.clear();
 }

@@ -21,8 +21,13 @@ export function angleSummary(camera: JobRecord['snapshot']['draft']['camera']): 
 export function jobMeta(job: JobRecord): string {
   const d = job.snapshot.draft;
   const n = d.count === 1 ? '1 image' : `${d.count} images`;
-  const where = job.snapshot.execution === 'cloud' ? 'simulated cloud' : 'on this device';
+  const where = whereLabel(job);
   return `${n}, ${angleSummary(d.camera)}, ${where}`;
+}
+
+export function whereLabel(job: JobRecord): string {
+  if (job.snapshot.engine.provider === 'huggingface-space') return 'Hugging Face';
+  return job.snapshot.execution === 'cloud' ? 'simulated cloud' : 'on this device';
 }
 
 export function jobStateLabel(job: JobRecord, uploading: boolean): { text: string; alert: boolean } {
@@ -76,6 +81,15 @@ export const ERROR_TEXT: Record<string, string> = {
   'not-found': 'The provider has no record of this image.',
   'render-failed': 'The image could not be rendered.',
   'source-missing': 'The source image is no longer stored on this device.',
+  quota: 'Your Hugging Face GPU time for today is used up. It refills daily.',
+  'no-token': 'The local server has no Hugging Face token. Add HF_TOKEN to prototype/.env.local, then restart it.',
+  'token-rejected': 'Hugging Face rejected the token. Create a new read token, then restart the local server.',
+  unreachable: "The local server can't reach Hugging Face. Check the connection.",
+  'space-unavailable': 'The camera-angle model is not available right now. Try again later.',
+  timeout: 'The model took too long. Try again when it is less busy.',
+  'local-server': "The studio's local server isn't running. Start it with npm run dev.",
+  'bad-request': 'The local server refused the request.',
+  failed: 'The model could not make this view. Try again.',
 };
 
 const thumbCache = new Map<string, string>();

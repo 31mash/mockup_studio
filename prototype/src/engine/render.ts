@@ -14,6 +14,12 @@ export type RenderInput = {
   subject: HTMLCanvasElement;
   cutout: Cutout;
   camera: { rotation: number; tilt: number; zoom: number };
+  /**
+   * How far to turn the subject itself, when it differs from the camera: a
+   * generated view already shows most of the turn, and only the rest is
+   * turned in perspective. Defaults to the camera's rotation and tilt.
+   */
+  turn?: { rotation: number; tilt: number };
   color: string;
   seed: number;
 };
@@ -42,8 +48,9 @@ export function renderImage(input: RenderInput): HTMLCanvasElement {
 
   // Turn the product for real when the camera moves around it.
   let subject = input.subject;
-  if (input.cutout !== 'none' && (Math.abs(camera.rotation) >= 1 || Math.abs(camera.tilt) >= 1)) {
-    subject = reproject(subject, camera.rotation, camera.tilt, light) ?? subject;
+  const turn = input.turn ?? camera;
+  if (input.cutout !== 'none' && (Math.abs(turn.rotation) >= 1 || Math.abs(turn.tilt) >= 1)) {
+    subject = reproject(subject, turn.rotation, turn.tilt, light) ?? subject;
   }
 
   // Size the subject without ever cropping or stretching it.

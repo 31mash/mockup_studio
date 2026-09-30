@@ -140,6 +140,8 @@ export type AssetMeta = {
 
 export type Settings = {
   execution: Execution;
+  /** Which cloud engine runs cloud jobs: the simulation, or Hugging Face via the local server. */
+  cloudProvider: 'simulated' | 'huggingface';
   simulateOffline: boolean;
   failOneSlot: boolean;
   theme: 'system' | 'light' | 'dark';

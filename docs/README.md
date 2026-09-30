@@ -2,7 +2,7 @@
 
 Planning documents for **Future Mockup Studio** (working name), an image studio with two tabs, **Product** and **Model**. You pick a product or a person, choose a setting, ratio and camera angle, and get 1, 2 or 4 finished still images, without writing a prompt.
 
-> **Status: planning, with a working prototype.** The PRD and plan are a complete proposal dated 29 September 2026. A UX prototype now lives in [`../prototype`](../prototype/README.md); it does not replace the plan's engine qualification. Nothing here has been benchmarked, and every timing, quality threshold and engine choice is a proposal to validate.
+> **Status: planning, with a working prototype.** The PRD and plan are a complete proposal dated 29 September 2026. A UX prototype now lives in [`../prototype`](../prototype/README.md). Run on your computer with a Hugging Face token, it also generates new camera angles with a real image model through a small local server. It does not replace the plan's engine qualification. Nothing here has been benchmarked, and every timing, quality threshold and engine choice is a proposal to validate.
 
 ## Start here
 

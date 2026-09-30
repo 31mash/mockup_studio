@@ -16,10 +16,9 @@ import {
 import { resolveTarget } from '../domain/generation';
 import { describeModel, filterModels, NO_FILTERS, type ModelFilters, type ModelPreset } from '../domain/models';
 import type { StudioTab } from '../domain/studio';
-import { engineFor } from '../engine/engines';
 import { setSource } from '../state/actions';
 import { useAssetUrl } from '../state/assets';
-import { getState, updateDraft, useApp } from '../state/store';
+import { currentEngine, getState, updateDraft, useApp } from '../state/store';
 import { RatioGlyph } from './Composer';
 import { sceneThumb } from './labels';
 import { Sheet } from './Sheet';
@@ -49,8 +48,8 @@ function sourceDims(tab: StudioTab): { width: number; height: number } {
 
 export function RatioPicker({ tab, open, onClose, anchor }: PickerProps) {
   const ratio = useApp((s) => s.drafts[tab].ratio);
-  const execution = useApp((s) => s.settings.execution);
-  const target = resolveTarget(ratio, sourceDims(tab), engineFor(execution).caps);
+  const engine = useApp(currentEngine);
+  const target = resolveTarget(ratio, sourceDims(tab), engine.caps);
   const select = (i: number) => updateDraft(tab, { ratio: RATIOS[i].id });
 
   return (

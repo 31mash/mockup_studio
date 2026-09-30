@@ -4,7 +4,7 @@ Creative mockups: product and lifestyle still shoots.
 
 **Future Mockup Studio** (working name) is a planned image studio for small brands, online sellers, designers and content creators. Pick a product or a person, choose a setting, ratio and camera angle, and get 1, 2 or 4 finished stills, without writing a prompt. It generates in the cloud or, after setup, on your own machine with no connection.
 
-> **Status: working prototype.** The PRD, implementation plan and research log are in [`docs/`](docs/README.md). A working prototype of the studio is in [`prototype/`](prototype/README.md). It generates real images in the browser with a sketch compositor; the cloud provider and the local model are still to come.
+> **Status: working prototype.** The PRD, implementation plan and research log are in [`docs/`](docs/README.md). A working prototype of the studio is in [`prototype/`](prototype/README.md). It generates real images in the browser with a sketch compositor. Run on your computer, it also makes new camera angles with a real image model on Hugging Face, through a small local server that keeps your token off the page. A full cloud provider and an offline local model are still to come.
 
 ## What it will do
 
@@ -20,10 +20,11 @@ Creative mockups: product and lifestyle still shoots.
 ```bash
 cd prototype
 npm install
-npm run dev
+cp .env.example .env.local   # optional: add HF_TOKEN for generative camera angles
+npm run dev                  # http://localhost:5173
 ```
 
-See [`prototype/README.md`](prototype/README.md) for what is real, what is simulated, and how the design was built.
+See [`prototype/README.md`](prototype/README.md) for what is real, what is simulated, how the local server works, and how the design was built.
 
 ## Documentation
 

@@ -1,11 +1,13 @@
 import { ArrowLeft, ArrowRight, DownloadSimple, PaperPlaneTilt, Trash, X } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
-import { describeCamera } from '../domain/camera';
+import { describePlan, planAngle } from '../domain/angles';
+import { describeCamera, isOriginal } from '../domain/camera';
 import { findBackground } from '../domain/catalogs';
 import { findModel } from '../domain/models';
-import { engineById } from '../engine/engines';
+import { engineById, HF_ANGLES } from '../engine/engines';
+import type { LocalStatus } from '../engine/generative';
 import type { Cutout } from '../engine/subject';
-import { deleteQueued, downloadResult, exportProject, removeJob, resetProject, sendQueued } from '../state/actions';
+import { deleteQueued, downloadResult, exportProject, refreshLocal, removeJob, resetProject, sendQueued } from '../state/actions';
 import { subjectFor, useAssetUrl } from '../state/assets';
 import { dismissToast, isOnline, setState, updateSettings, useApp } from '../state/store';
 import { storageEstimate } from '../storage/db';
@@ -94,16 +96,19 @@ export function JobDetails({ jobId, onClose }: { jobId: string | null; onClose: 
   const d = snapshot.draft;
   const engine = engineById(snapshot.engine.provider);
   const model = d.source.kind === 'catalog' ? findModel(d.source.modelId) : undefined;
+  const generative = engine === HF_ANGLES;
+  const plan = generative ? planAngle(d.camera, { refine: d.tab === 'product' }) : null;
+  const angleHow = isOriginal(d.camera) ? '' : plan ? describePlan(plan) : 'turned in perspective from your photo';
   const rows: [string, string][] = [
-    ['Runs on', engine.execution === 'cloud' ? 'Cloud (simulated)' : 'This device'],
+    ['Runs on', generative ? 'Hugging Face, through the local server' : engine.execution === 'cloud' ? 'Cloud (simulated)' : 'This device'],
     ['Engine', `${snapshot.engine.provider} / ${snapshot.engine.model} ${snapshot.engine.version}`],
     ['Prompt template', snapshot.promptVersion],
     ['Source', model ? `${model.label} (catalog stand-in)` : source?.name ?? 'Missing'],
-    ['Subject', cutout ? CUTOUT_TEXT[cutout] : 'Checking'],
+    ['Subject', `${cutout ? CUTOUT_TEXT[cutout] : 'Checking'}${plan?.view ? '. Each new view is cut out of the model image on this device' : ''}`],
     ['Background', `${findBackground(d.tab, d.backgroundId).label}${d.backgroundId === 'seamless-monochrome' && d.monochromeColor ? `, ${d.monochromeColor}` : ''}`],
     ['Ratio', ratioLabel(d.ratio)],
     ['Output size', `${snapshot.target.width} × ${snapshot.target.height} px, ${snapshot.target.framing} framing`],
-    ['Angle', `${describeCamera(d.camera)}${d.camera.kind === 'preset' && d.camera.name === 'original' ? '' : ', turned in perspective from your photo'}`],
+    ['Angle', `${describeCamera(d.camera)}${angleHow ? `, ${angleHow}` : ''}`],
     ['Results', String(d.count)],
     ['Created', formatTime(snapshot.createdAt)],
   ];
@@ -153,7 +158,11 @@ export function JobDetails({ jobId, onClose }: { jobId: string | null; onClose: 
       <div className="field">
         <span className="field-label">Generation brief</span>
         <pre className="brief">{snapshot.brief}</pre>
-        <p className="hint">Built from your settings and text. A real image model receives this with the source image.</p>
+        <p className="hint">
+          {generative
+            ? 'Built from your settings and text, for a full image model. The camera-angle model receives only the view and your cut-out subject; the scene, light and shadows are made on this device.'
+            : 'Built from your settings and text. A real image model receives this with the source image.'}
+        </p>
       </div>
       <div className="field">
         <span className="field-label">Images</span>
@@ -174,6 +183,7 @@ export function JobDetails({ jobId, onClose }: { jobId: string | null; onClose: 
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const settings = useApp((s) => s.settings);
+  const local = useApp((s) => s.local);
   const online = useApp(isOnline);
   const browserOnline = useApp((s) => s.browserOnline);
   const storage = useApp((s) => s.storage);
@@ -181,8 +191,14 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [usage, setUsage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (open) void refreshLocal();
+  }, [open]);
+
+  useEffect(() => {
     if (open) storageEstimate().then((e) => setUsage(e ? `${formatBytes(e.usage)} used of ${formatBytes(e.quota)} available` : null));
   }, [open, assets]);
+
+  const hfSelected = settings.execution === 'cloud' && settings.cloudProvider === 'huggingface';
 
   return (
     <Sheet open={open} onClose={onClose} title="Settings" variant="side" width={460}>
@@ -198,8 +214,32 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
               <span>Prototype sketch engine in your browser. Works offline and never uploads your photos.</span>
             </span>
           </label>
+          <label className={`radio-card${hfSelected || local.state === 'ready' ? '' : ' is-unavailable'}`}>
+            <input
+              type="radio"
+              name="execution"
+              checked={hfSelected}
+              disabled={!hfSelected && local.state !== 'ready'}
+              aria-describedby="hf-status"
+              onChange={() => updateSettings({ execution: 'cloud', cloudProvider: 'huggingface' })}
+            />
+            <span>
+              <b>Generative angles</b>
+              <span>
+                A camera-angle model on Hugging Face, called by the local server on this computer. It draws views your photo doesn't show: profiles, the back, high angles, and people. Uses your account's GPU time.
+              </span>
+              <span className={`radio-status${local.state === 'ready' ? ' is-ready' : ''}`} id="hf-status" role="status">
+                {localLine(local)}
+              </span>
+            </span>
+          </label>
+          {local.state === 'not-ready' && (
+            <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => void refreshLocal()}>
+              Check the local server again
+            </button>
+          )}
           <label className="radio-card">
-            <input type="radio" name="execution" checked={settings.execution === 'cloud'} onChange={() => updateSettings({ execution: 'cloud' })} />
+            <input type="radio" name="execution" checked={settings.execution === 'cloud' && !hfSelected} onChange={() => updateSettings({ execution: 'cloud', cloudProvider: 'simulated' })} />
             <span>
               <b>Cloud (simulated)</b>
               <span>Acts like a cloud provider: upload, queue and network delays. While offline, jobs queue until you review and send them.</span>
@@ -250,6 +290,18 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
       </div>
     </Sheet>
   );
+}
+
+function localLine(local: LocalStatus): string {
+  switch (local.state) {
+    case 'checking':
+      return 'Checking the local server.';
+    case 'ready':
+      if (local.provider === 'mock') return 'Ready: test provider, returns your photo unchanged.';
+      return `Ready${local.account ? `, as ${local.account}` : ''}. Model: ${local.space}.`;
+    default:
+      return local.reason;
+  }
 }
 
 // ---------------------------------------------------------------- project

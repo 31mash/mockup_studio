@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:artifact": "npm run build && node scripts/to-artifact.mjs",
+    "build:artifact": "tsc -b && vite build --mode artifact && node scripts/to-artifact.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@fontsource/anton": "^5.3.0",
     "@fontsource/archivo": "^5.3.0",
+    "@gradio/client": "^2.7.1",
     "@phosphor-icons/react": "^2.1.10",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.3.0",

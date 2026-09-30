@@ -3,6 +3,8 @@ import { createDraft } from '../domain/generation';
 import type { AssetMeta, Draft, JobRecord, Project, QueuedIntent, Settings, StudioTab } from '../domain/studio';
 import { saveJSON } from '../storage/db';
 import type { SaveMode } from '../storage/download';
+import { engineFor, type Engine } from '../engine/engines';
+import type { LocalStatus } from '../engine/generative';
 
 export type Toast = { id: number; text: string; tone: 'info' | 'error' };
 
@@ -21,6 +23,8 @@ export type AppState = {
   uploading: Record<string, boolean>;
   toasts: Toast[];
   saveMode: SaveMode;
+  /** The studio's local server, which runs the generative engine. */
+  local: LocalStatus;
 };
 
 export type Persisted = Pick<AppState, 'project' | 'tab' | 'drafts' | 'assets' | 'jobs' | 'queue' | 'settings'>;
@@ -31,7 +35,12 @@ export function newProject(): Project {
   return { id: `project_${Date.now().toString(36)}`, name: 'Untitled project', createdAt: now, updatedAt: now, schemaVersion: 1 };
 }
 
-export const DEFAULT_SETTINGS: Settings = { execution: 'local', simulateOffline: false, failOneSlot: false, theme: 'system' };
+export const DEFAULT_SETTINGS: Settings = { execution: 'local', cloudProvider: 'simulated', simulateOffline: false, failOneSlot: false, theme: 'system' };
+
+/** The engine new jobs use, from Settings. */
+export function currentEngine(s: AppState): Engine {
+  return engineFor(s.settings.execution, s.settings.cloudProvider);
+}
 
 let state: AppState = {
   ready: false,
@@ -47,6 +56,7 @@ let state: AppState = {
   uploading: {},
   toasts: [],
   saveMode: typeof window !== 'undefined' && 'claude' in window ? 'none' : 'browser',
+  local: { state: 'checking' },
 };
 
 const listeners = new Set<() => void>();

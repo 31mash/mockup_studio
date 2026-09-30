@@ -6,10 +6,9 @@ import { generateLabel } from '../domain/generation';
 import { describeModel, findModel } from '../domain/models';
 import { detectConflicts } from '../domain/prompt';
 import { OUTPUT_COUNTS, type OutputCount, type StudioTab } from '../domain/studio';
-import { engineFor } from '../engine/engines';
 import { acknowledgeRights, generate, issuesFor, setSource, uploadSource } from '../state/actions';
 import { useAssetUrl } from '../state/assets';
-import { isOnline, updateDraft, useApp } from '../state/store';
+import { currentEngine, isOnline, updateDraft, useApp } from '../state/store';
 import { ratioLabel, sceneThumb } from './labels';
 
 export type ComposerDialog = 'ratio' | 'background' | 'angle' | 'model' | 'saved';
@@ -330,12 +329,12 @@ function CountField({ tab }: { tab: StudioTab }) {
 function GenerateBar({ tab }: { tab: StudioTab }) {
   const draft = useApp((s) => s.drafts[tab]);
   const assets = useApp((s) => s.assets);
-  const execution = useApp((s) => s.settings.execution);
+  const engine = useApp(currentEngine);
+  const local = useApp((s) => s.local);
   const online = useApp(isOnline);
   const [busy, setBusy] = useState(false);
   // Recompute whenever inputs that affect validation change.
-  const issues = useMemo(() => issuesFor(tab), [tab, draft, assets, execution]);
-  const engine = engineFor(execution);
+  const issues = useMemo(() => issuesFor(tab), [tab, draft, assets, engine, local, online]);
   const willQueue = engine.execution === 'cloud' && !online;
   const disabled = issues.length > 0 || busy;
   const label = willQueue ? 'Queue for online' : generateLabel(draft.count);

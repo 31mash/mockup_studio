@@ -6,7 +6,9 @@ export default defineConfig({
   fullyParallel: false,
   reporter: 'list',
   use: { baseURL: 'http://localhost:4173', trace: 'retain-on-failure' },
-  webServer: { command: 'npx vite preview --port 4173 --strictPort', port: 4173, reuseExistingServer: true },
+  // The preview server includes the local server; the mock provider stands in
+  // for Hugging Face so generative jobs run without a network or a token.
+  webServer: { command: 'npx vite preview --port 4173 --strictPort', port: 4173, reuseExistingServer: true, env: { MOCKUP_ANGLES: 'mock' } },
   projects: [
     {
       name: 'desktop',

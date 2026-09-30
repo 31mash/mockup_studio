@@ -9,12 +9,19 @@ type Props = {
 export function TopBar({ onSettings, onProject }: Props) {
   const name = useApp((s) => s.project.name);
   const execution = useApp((s) => s.settings.execution);
+  const generative = useApp((s) => s.settings.execution === 'cloud' && s.settings.cloudProvider === 'huggingface');
   const online = useApp(isOnline);
   const storage = useApp((s) => s.storage);
 
   const cloud = execution === 'cloud';
-  const label = cloud ? (online ? 'Cloud' : 'Offline') : 'On this device';
-  const full = cloud ? (online ? 'Cloud (simulated), connected' : 'Offline. Cloud jobs will queue') : `On this device${online ? '' : ', offline'}`;
+  const label = cloud ? (online ? (generative ? 'Hugging Face' : 'Cloud') : 'Offline') : 'On this device';
+  const full = cloud
+    ? online
+      ? generative
+        ? 'Generative angles on Hugging Face, through the local server'
+        : 'Cloud (simulated), connected'
+      : 'Offline. Cloud jobs will queue'
+    : `On this device${online ? '' : ', offline'}`;
 
   return (
     <header className="topbar">

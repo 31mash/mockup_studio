@@ -3,9 +3,9 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import { cameraPosition, describeCamera, isOriginal, normalizeCamera, ORIGINAL } from '../domain/camera';
 import { CAMERA_PRESETS, CAMERA_RANGE } from '../domain/catalogs';
 import type { CameraIntent, StudioTab } from '../domain/studio';
-import { engineFor } from '../engine/engines';
+import { MODEL_AZIMUTHS } from '../domain/angles';
 import { useAssetUrl } from '../state/assets';
-import { updateDraft, useApp } from '../state/store';
+import { currentEngine, updateDraft, useApp } from '../state/store';
 import { Sheet } from './Sheet';
 
 type Props = { tab: StudioTab; open: boolean; onClose: () => void };
@@ -21,7 +21,7 @@ type Range = { min: number; max: number };
 export function AngleSheet({ tab, open, onClose }: Props) {
   const saved = useApp((s) => s.drafts[tab].camera);
   const sourceId = useApp((s) => s.drafts[tab].source?.assetId);
-  const execution = useApp((s) => s.settings.execution);
+  const engine = useApp(currentEngine);
   const [intent, setIntent] = useState<CameraIntent>(saved);
 
   // Each time the sheet opens, start from the draft's current camera.
@@ -30,8 +30,10 @@ export function AngleSheet({ tab, open, onClose }: Props) {
   }, [open]);
 
   // What the current engine can do. The controls never offer more.
-  const caps = engineFor(execution).caps;
+  const caps = engine.caps;
   const limits = caps.cameraLimits;
+  // A generative engine draws new views; the sketch engine turns the photo.
+  const generative = caps.camera === 'validated-view-control';
   const person = tab === 'model' && caps.turnsPeople === false;
   const rotRange: Range = person ? { min: 0, max: 0 } : limits ? { min: -limits.rotation, max: limits.rotation } : CAMERA_RANGE.rotation;
   const tiltRange: Range = person ? { min: 0, max: 0 } : limits ? { min: limits.tiltMin, max: limits.tiltMax } : CAMERA_RANGE.tilt;
@@ -80,7 +82,7 @@ export function AngleSheet({ tab, open, onClose }: Props) {
       }
     >
       <div className="angle-body">
-        <Orbit intent={intent} sourceId={sourceId} onMove={setRelative} rotRange={rotRange} locked={person} />
+        <Orbit intent={intent} sourceId={sourceId} onMove={setRelative} rotRange={rotRange} locked={person} steps={generative ? [...MODEL_AZIMUTHS] : undefined} />
         <div className="field" style={{ gap: 'var(--s4)' }}>
           <div className="field">
             <span className="field-label" id={`presets-${tab}`}>
@@ -114,9 +116,13 @@ export function AngleSheet({ tab, open, onClose }: Props) {
               ))}
             </div>
             <p className="hint">
-              {person
-                ? 'Turning a person needs a generative engine. Zoom still works here.'
-                : 'Profile and top-down views need a generative engine: a photo has no pixels for those sides.'}
+              {generative
+                ? tab === 'model'
+                  ? 'The model draws the person from the new side, in 45° steps. Angles in between snap to the nearest step.'
+                  : 'The model draws views your photo does not show, in 45° steps (dots on the ring) and four heights. The studio turns the product the rest of the way in perspective.'
+                : person
+                  ? 'Turning a person needs a generative engine. Zoom still works here.'
+                  : 'Profile and top-down views need a generative engine: a photo has no pixels for those sides.'}
             </p>
           </div>
           <div className="field">
@@ -136,7 +142,11 @@ export function AngleSheet({ tab, open, onClose }: Props) {
       </div>
       {!isOriginal(intent) && (
         <p className="note is-quiet">
-          {turned
+          {turned && generative
+            ? tab === 'model'
+              ? 'The model draws this view from your photo. What it cannot see, such as the back of the head or clothing, is its best guess: check the face, hands and details before you use the image. Scene, light and shadow are made on this device.'
+              : 'The model draws this view from your photo. Sides it cannot see, such as the back or the base, are its best guess: check labels, text and logos before you use the image. Scene, light and shadow are made on this device.'
+            : turned
             ? 'The product turns in real perspective, using your photo. Its sides take the color of its edges, and the scene, light and shadow follow the camera.'
             : 'Zoom changes the framing. Nothing is cropped.'}
         </p>
@@ -197,12 +207,15 @@ function Orbit({
   onMove,
   rotRange,
   locked,
+  steps,
 }: {
   intent: CameraIntent;
   sourceId?: string;
   onMove: (p: { rotation: number; tilt: number }) => void;
   rotRange: Range;
   locked: boolean;
+  /** Azimuths a generative engine is trained on, marked on the ring. */
+  steps?: number[];
 }) {
   const url = useAssetUrl(sourceId);
   const drag = useRef<{ x: number; y: number; rotation: number; tilt: number } | null>(null);
@@ -219,7 +232,7 @@ function Orbit({
 
   // The stretch of orbit this engine can reach, drawn along the ring.
   const reach: string[] = [];
-  for (let a = rotRange.min; a <= rotRange.max; a += 2.5) {
+  for (let a = rotRange.min; rotRange.max - rotRange.min < 360 && a <= rotRange.max; a += 2.5) {
     const rx = C + R * Math.sin(rad(a));
     const ry = C + R * Math.cos(rad(a)) * Math.sin(VIEW);
     reach.push(`${rx.toFixed(1)},${ry.toFixed(1)}`);
@@ -276,6 +289,9 @@ function Orbit({
         })}
         <ellipse className="orbit-ring" cx={C} cy={C} rx={R} ry={R * Math.sin(VIEW)} />
         {reach.length > 1 && <polyline className="orbit-reach" points={reach.join(' ')} />}
+        {steps?.map((a) => (
+          <circle key={a} className="orbit-step" cx={C + R * Math.sin(rad(a))} cy={C + R * Math.cos(rad(a)) * Math.sin(VIEW)} r={3} />
+        ))}
         <line className="orbit-path" x1={C} y1={C} x2={x} y2={y} />
       </svg>
       <p className="orbit-hint">{locked ? 'People keep their photographed angle' : 'Drag to move the camera'}</p>

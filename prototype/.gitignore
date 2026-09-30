@@ -4,3 +4,6 @@ test-results/
 playwright-report/
 artifact/
 *.tsbuildinfo
+# Local secrets: HF_TOKEN lives here and must never be committed.
+.env.local
+.env.*.local

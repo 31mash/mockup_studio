@@ -7,13 +7,17 @@ import { composeBrief, PROMPT_VERSION } from '../domain/prompt';
 import type { AssetMeta, Draft, Issue, JobRecord, JobSnapshot, QueuedIntent, Slot, Source, StudioTab } from '../domain/studio';
 import { canvasToBlob } from '../engine/canvas';
 import { hashString } from '../engine/color';
-import { CLOUD_SIM, engineById, engineFor, nextFrame, renderSlot, sleep, type Engine } from '../engine/engines';
+import { ERROR_TEXT } from '../components/labels';
+import { planAngle } from '../domain/angles';
+import { CLOUD_SIM, engineById, engineFor, HF_ANGLES, nextFrame, renderSlot, sleep, type Engine } from '../engine/engines';
+import { LocalServerError, probeLocalServer } from '../engine/generative';
 import { drawSampleProduct } from '../engine/standins';
 import { clearAll, loadJSON, openStorage, requestPersistence } from '../storage/db';
 import { safeName, saveFile, saveMode } from '../storage/download';
 import { canvasAsset, normalizeUpload, toPng, UploadError } from '../storage/images';
-import { addAsset, assetBlob, forgetAll, subjectFor } from './assets';
+import { addAsset, assetBlob, forgetAll, generatedSubject, subjectFor } from './assets';
 import {
+  currentEngine,
   DEFAULT_SETTINGS,
   flushPersist,
   getState,
@@ -52,8 +56,14 @@ export async function init(): Promise<void> {
     setState({ ready: true });
     await flushPersist();
   }
+  void refreshLocal();
   window.addEventListener('online', () => setState({ browserOnline: true }));
   window.addEventListener('offline', () => setState({ browserOnline: false }));
+}
+
+/** Ask the local server whether the generative engine is ready. */
+export async function refreshLocal(): Promise<void> {
+  setState({ local: await probeLocalServer() });
 }
 
 /** A job interrupted by a reload: local work failed; cloud outcome is unknown. */
@@ -144,8 +154,13 @@ function sourceMeta(source: Source): AssetMeta | undefined {
 export function issuesFor(tab: StudioTab): Issue[] {
   const s = getState();
   const draft = s.drafts[tab];
-  const engine = engineFor(s.settings.execution);
-  return validateDraft(draft, engine.caps, { sourceAsset: draft.source ? sourceMeta(draft.source) : undefined });
+  const engine = currentEngine(s);
+  const issues = validateDraft(draft, engine.caps, { sourceAsset: draft.source ? sourceMeta(draft.source) : undefined });
+  // Offline, the job queues; readiness is checked again when it is sent.
+  if (engine === HF_ANGLES && isOnline(s) && s.local.state !== 'ready') {
+    issues.push({ field: 'engine', code: 'engine-unavailable', message: s.local.state === 'checking' ? 'Checking the local server.' : s.local.reason });
+  }
+  return issues;
 }
 
 function buildJob(draft: Draft & { source: Source }, engine: Engine, meta: AssetMeta | undefined, queuedIntentId?: string): JobRecord {
@@ -175,7 +190,7 @@ export async function generate(tab: StudioTab): Promise<void> {
   const s = getState();
   const draft = s.drafts[tab];
   if (issuesFor(tab).length || !draft.source) return;
-  const engine = engineFor(s.settings.execution);
+  const engine = currentEngine(s);
 
   if (engine.execution === 'cloud' && !isOnline(s)) {
     queueForOnline(tab);
@@ -198,6 +213,9 @@ function findJob(id: string): JobRecord | undefined {
   return getState().jobs.find((j) => j.snapshot.id === id);
 }
 
+/** Failures that will repeat for every remaining image in the batch. */
+const FATAL = new Set(['quota', 'no-token', 'token-rejected', 'local-server', 'unreachable', 'space-unavailable']);
+
 async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean } = {}): Promise<void> {
   const job = findJob(jobId);
   if (!job) return;
@@ -205,12 +223,15 @@ async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean 
   const controller = new AbortController();
   controllers.set(jobId, controller);
   const { signal } = controller;
-  const cloud = engine.execution === 'cloud';
+  const simulated = engine === CLOUD_SIM;
+  const generative = engine === HF_ANGLES;
   const failIndex = getState().settings.failOneSlot ? Math.min(2, job.slots.length - 1) : -1;
+  let fatal: string | null = null;
 
   try {
-    const subject = await subjectFor(job.snapshot.draft.source.assetId);
-    if (cloud) {
+    const sourceId = job.snapshot.draft.source.assetId;
+    const subject = await subjectFor(sourceId);
+    if (simulated) {
       setState((s) => ({ uploading: { ...s.uploading, [jobId]: true } }));
       await sleep(700, signal);
       setState((s) => ({ uploading: { ...s.uploading, [jobId]: false } }));
@@ -222,24 +243,39 @@ async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean 
         const index = queue.shift()!;
         const slot = findJob(jobId)?.slots.find((x) => x.index === index);
         if (!slot) continue;
+        if (fatal) {
+          setSlot(jobId, index, { state: 'failed', errorCode: fatal });
+          continue;
+        }
         try {
-          if (cloud) await sleep(400 + Math.random() * 700, signal);
-          setSlot(jobId, index, { state: 'running', errorCode: undefined, remoteId: cloud ? newId('remote') : undefined });
+          if (simulated) await sleep(400 + Math.random() * 700, signal);
+          setSlot(jobId, index, { state: 'running', errorCode: undefined, remoteId: simulated ? newId('remote') : undefined });
           await nextFrame();
-          if (cloud) await sleep(1200 + Math.random() * 1400, signal);
-          else await sleep(350, signal);
+          if (simulated) await sleep(1200 + Math.random() * 1400, signal);
+          else if (!generative) await sleep(350, signal);
           if (index === failIndex && slot.attempt === 1) throw new Error('test-failure');
 
           const snap = findJob(jobId)!.snapshot;
           const pos = cameraPosition(snap.draft.camera);
+          let placed = subject;
+          let turn: { rotation: number; tilt: number } | undefined;
+          if (generative) {
+            // The model draws the nearest trained view; products are refined
+            // the rest of the way in perspective, people snap to the view.
+            const person = snap.draft.tab === 'model';
+            const plan = planAngle(snap.draft.camera, { refine: !person });
+            if (plan.view) placed = await generatedSubject(sourceId, subject, plan.view, slot.seed ?? index, person, signal);
+            turn = plan.refine;
+          }
           const canvas = renderSlot({
             tab: snap.draft.tab,
             scene: snap.draft.backgroundId as SceneKind,
             width: snap.target.width,
             height: snap.target.height,
-            subject: subject.canvas,
-            cutout: subject.cutout,
+            subject: placed.canvas,
+            cutout: placed.cutout,
             camera: pos,
+            turn,
             color: snap.draft.monochromeColor ?? DEFAULT_MONOCHROME,
             seed: slot.seed ?? index,
           });
@@ -264,7 +300,12 @@ async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean 
           setSlot(jobId, index, { state: 'succeeded', assetId });
         } catch (e) {
           if ((e as Error).name === 'AbortError') setSlot(jobId, index, { state: 'canceled' });
-          else setSlot(jobId, index, { state: 'failed', errorCode: (e as Error).message === 'test-failure' ? 'test-failure' : 'render-failed' });
+          else {
+            const code = e instanceof LocalServerError ? e.code : (e as Error).message === 'test-failure' ? 'test-failure' : 'render-failed';
+            if (e instanceof LocalServerError) console.warn('[generative]', e.code, e.message);
+            if (FATAL.has(code)) fatal = code;
+            setSlot(jobId, index, { state: 'failed', errorCode: code });
+          }
         }
       }
     };
@@ -282,6 +323,7 @@ async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean 
     controllers.delete(jobId);
     setState((s) => ({ uploading: { ...s.uploading, [jobId]: false } }));
   }
+  if (fatal) void refreshLocal();
 
   const done = findJob(jobId);
   if (!done || opts.quiet) return;
@@ -289,7 +331,7 @@ async function runJob(jobId: string, indexes: number[], opts: { quiet?: boolean 
   if (ok) void requestPersistence();
   if (done.state === 'succeeded') toast(ok === 1 ? 'Your image is ready.' : `${ok} images are ready.`);
   else if (done.state === 'partial') toast(`${ok} of ${done.slots.length} images are ready. One or more failed; you can retry them.`, 'error');
-  else if (done.state === 'failed') toast('The images could not be generated. Retry, or check the job details.', 'error');
+  else if (done.state === 'failed') toast(fatal ? ERROR_TEXT[fatal] ?? 'The images could not be generated.' : 'The images could not be generated. Retry, or check the job details.', 'error');
 }
 
 function cancelRemaining(jobId: string): void {
@@ -351,7 +393,13 @@ export function sendQueued(intentId: string): void {
   const s = getState();
   const intent = s.queue.find((q) => q.id === intentId);
   if (!intent || !isOnline(s)) return;
-  const job = buildJob(intent.draft, CLOUD_SIM, sourceMeta(intent.draft.source), intent.id);
+  const engine = engineFor('cloud', s.settings.cloudProvider);
+  if (engine === HF_ANGLES && s.local.state !== 'ready') {
+    void refreshLocal();
+    toast(s.local.state === 'checking' ? 'Checking the local server. Try again in a moment.' : s.local.reason, 'error');
+    return;
+  }
+  const job = buildJob(intent.draft, engine, sourceMeta(intent.draft.source), intent.id);
   setState((st) => ({ queue: st.queue.filter((q) => q.id !== intentId), jobs: [job, ...st.jobs], tab: intent.draft.tab }));
   void runJob(job.snapshot.id, job.slots.map((x) => x.index));
 }

@@ -256,3 +256,44 @@ test('a turned product renders, and people keep their photographed angle', async
   await expect(sheet.getByRole('radio', { name: 'Three-quarter left' })).toBeDisabled();
   await expect(sheet.getByText('Turning a person needs a generative engine. Zoom still works here.')).toBeVisible();
 });
+
+test('generative angles: a profile and a turned person through the local server', async ({ page }) => {
+  // The preview server runs the local server with the mock provider
+  // (playwright.config.ts), which returns the sent image unchanged.
+  await openStudio(page);
+  const settings = await openSettings(page);
+  await expect(settings.getByText('Ready: test provider, returns your photo unchanged.')).toBeVisible();
+  await settings.getByRole('radio', { name: /Generative angles/ }).check();
+  await settings.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: /Where images are made: Generative angles on Hugging Face/ })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Angle:/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Camera angle' });
+  await sheet.getByRole('radio', { name: 'Left profile' }).click();
+  await expect(sheet.getByText(/The model draws this view from your photo/)).toBeVisible();
+  await sheet.getByRole('button', { name: 'Apply angle' }).click();
+  await page.getByRole('button', { name: 'Generate 1 image' }).click();
+  let job = newestJob(page);
+  await expect(job.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(1, { timeout: 30_000 });
+  await expect(job.getByText('1 image, left profile view, Hugging Face')).toBeVisible();
+  await job.getByRole('button', { name: /^Details for/ }).click();
+  const details = page.getByRole('dialog', { name: 'Job details' });
+  await expect(details.getByText('Left profile, generated as the left side view, eye level')).toBeVisible();
+  await expect(details.getByText('Hugging Face, through the local server')).toBeVisible();
+  await details.getByRole('button', { name: 'Close' }).click();
+
+  // People can turn with this engine; in-between angles snap to the model's steps.
+  await page.getByRole('tab', { name: 'Model', exact: true }).click();
+  await page.getByRole('button', { name: 'Select model', exact: true }).click();
+  await page.getByRole('button', { name: 'Select model Maya' }).click();
+  await page.getByRole('button', { name: /^Angle:/ }).click();
+  await expect(sheet.getByLabel('Rotation', { exact: true })).toBeEnabled();
+  await sheet.getByLabel('Rotation in degrees').fill('-30');
+  await sheet.getByLabel('Rotation in degrees').press('Enter');
+  await sheet.getByRole('button', { name: 'Apply angle' }).click();
+  await page.getByRole('button', { name: 'Generate 1 image' }).click();
+  job = newestJob(page);
+  await expect(job.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(1, { timeout: 30_000 });
+  await job.getByRole('button', { name: /^Details for/ }).click();
+  await expect(details.getByText(/generated as the front-left quarter view, eye level$/)).toBeVisible();
+});

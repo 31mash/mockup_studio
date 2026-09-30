@@ -1473,3 +1473,23 @@ dialog.sheet.is-popover::backdrop {
     animation: none;
   }
 }
+
+/* Generative angles: engine status in Settings, trained views on the orbit. */
+.radio-card .radio-status {
+  display: block;
+  margin-top: var(--s2);
+}
+.radio-card .radio-status.is-ready {
+  color: var(--ink);
+}
+.radio-card.is-unavailable {
+  cursor: default;
+}
+.radio-card.is-unavailable b {
+  color: var(--muted);
+}
+.orbit-step {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}

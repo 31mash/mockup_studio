@@ -1,10 +1,10 @@
-import { RATIOS, type SceneKind } from '../domain/catalogs';
+import { CAMERA_PRESETS, RATIOS, type SceneKind } from '../domain/catalogs';
 import type { Capabilities, Execution } from '../domain/studio';
 import { renderImage, type RenderInput } from './render';
 import { canReproject, TURN_LIMITS } from './view3d';
 
 export type Engine = {
-  id: 'local-sketch' | 'cloud-sim';
+  id: 'local-sketch' | 'cloud-sim' | 'hf-angles';
   label: string;
   execution: Execution;
   provider: string;
@@ -59,12 +59,45 @@ export const CLOUD_SIM: Engine = {
   runsOn: 'Runs in the simulated cloud. No cost in this prototype.',
 };
 
-export function engineFor(execution: Execution): Engine {
-  return execution === 'cloud' ? CLOUD_SIM : LOCAL_SKETCH;
+/**
+ * A real image model: Qwen-Image-Edit-2511 with fal's Multiple-Angles LoRA,
+ * on a Hugging Face Space. The studio's local server calls it with your token
+ * (server/angles.ts). It draws the views a photo does not contain, profiles,
+ * backs and high angles included, for products and people. The browser then
+ * cuts the new view out and places it in the scene with the usual shadows.
+ */
+export const HF_ANGLES: Engine = {
+  id: 'hf-angles',
+  label: 'Generative angles',
+  execution: 'cloud',
+  provider: 'huggingface-space',
+  model: 'qwen-image-edit-2511-multiple-angles',
+  version: 'lightning-4step',
+  caps: {
+    referenceEdit: true,
+    offline: false,
+    cancel: true,
+    maxParallel: 1,
+    camera: 'validated-view-control',
+    supportedCameraIntents: [...CAMERA_PRESETS.map((p) => p.id), 'relative'],
+    supportedRatios: RATIOS.map((r) => r.id),
+    dimensionStep: 1,
+    // All the way round; heights from low angle to top-down.
+    cameraLimits: { rotation: 180, tiltMin: -45, tiltMax: 90 },
+    turnsPeople: true,
+  },
+  runsOn: 'Each image is one generation on Hugging Face, sent by the local server with your token. It uses your account\'s GPU time.',
+};
+
+export type CloudProvider = 'simulated' | 'huggingface';
+
+export function engineFor(execution: Execution, cloud: CloudProvider = 'simulated'): Engine {
+  if (execution === 'local') return LOCAL_SKETCH;
+  return cloud === 'huggingface' ? HF_ANGLES : CLOUD_SIM;
 }
 
 export function engineById(provider: string): Engine {
-  return provider === CLOUD_SIM.provider ? CLOUD_SIM : LOCAL_SKETCH;
+  return [CLOUD_SIM, HF_ANGLES].find((e) => e.provider === provider) ?? LOCAL_SKETCH;
 }
 
 export type SlotRender = Omit<RenderInput, 'scene'> & { scene: SceneKind };
