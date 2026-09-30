@@ -36,22 +36,45 @@ def _samples(total, step, dense=(), edge=None):
 
 def deckle(u, rng, depth):
     """A torn perforation line: how far (cm) the edge is torn back at each u.
-    Irregular teeth, mostly shallow with the odd deeper bite, a slow wander,
-    and fibre-scale jitter."""
+
+    Measured on the photo: the tear is mostly a gentle wave (about +-0.1 cm
+    over runs of 0.5 to 1.5 cm, where the paper let go between perforations),
+    with fine jaggies on it and one or two deeper bites where a piece came
+    away with the other sheet. Fibre-scale jitter on top."""
     L = float(u.max()) + 1.0
+
+    # The wave: smooth runs between random knots.
     xs = [0.0]
     while xs[-1] < L:
-        xs.append(xs[-1] + rng.uniform(0.07, 0.34))
+        xs.append(xs[-1] + rng.uniform(0.5, 1.6))
     xs = np.array(xs)
-    ys = rng.uniform(0.0, 1.0, len(xs)) ** 2.2 * depth * 0.75
-    bites = rng.random(len(xs)) < 0.07
-    ys[bites] = rng.uniform(0.6, 1.0, bites.sum()) * depth
-    e = np.interp(u, xs, ys)
-    fx = np.arange(0.0, L, 0.035)
-    e += np.interp(u, fx, rng.normal(0.0, depth * 0.05, len(fx)))
-    ph = rng.uniform(0, 2 * math.pi, 2)
-    e += depth * 0.22 * (1 + 0.6 * np.sin(u * 0.55 + ph[0]) + 0.4 * np.sin(u * 1.7 + ph[1])) / 2
-    return np.clip(e, 0.0, depth * 1.1)
+    ys = rng.uniform(0.05, 0.75, len(xs)) * depth
+    i = np.clip(np.searchsorted(xs, u) - 1, 0, len(xs) - 2)
+    t = (u - xs[i]) / (xs[i + 1] - xs[i])
+    t = t * t * (3 - 2 * t)
+    e = ys[i] * (1 - t) + ys[i + 1] * t
+
+    # Fine jaggies: short teeth, mostly shallow.
+    tx = [0.0]
+    while tx[-1] < L:
+        tx.append(tx[-1] + rng.uniform(0.05, 0.2))
+    tx = np.array(tx)
+    e += np.interp(u, tx, rng.uniform(0.0, 1.0, len(tx)) ** 2.5 * depth * 0.28)
+
+    # A few deeper bites, where a piece came away with the next sheet: a
+    # shallow, ragged scoop 0.9 to 1.8 cm wide with sloping sides.
+    for _ in range(max(1, int(round(L / 13.0)))):
+        c = rng.uniform(1.0, L - 2.0)
+        w = rng.uniform(0.9, 1.8)
+        d = rng.uniform(0.35, 0.7) * depth
+        x = np.abs(u - c) / (w / 2)
+        prof = _smoothstep(1.0, rng.uniform(0.3, 0.5), x)
+        prof *= 1 + 0.18 * np.sin((u - c) * rng.uniform(18, 30) + rng.uniform(0, 6))
+        e += d * np.clip(prof, 0.0, None)
+
+    fx = np.arange(0.0, L, 0.03)
+    e += np.interp(u, fx, rng.normal(0.0, depth * 0.035, len(fx)))
+    return np.clip(e, 0.0, depth * 1.35)
 
 
 def _fold(P, z, p0, n, h):
@@ -94,12 +117,30 @@ def napkin(seed: int = 1, loft: float = 0.14):
 
     # The sheet is cut a hair out of square so the skewed fold 1 still brings
     # the two left edges together.
-    u = S * (SW + 2 * k * (V - D))
+    u_max = SW + 2 * k * (V - D)
+    u = S * u_max
+
+    # Cut edges of tissue are never ruler-straight: both side edges wander a
+    # little, each in its own way.
+    def wander(t, amp):
+        ph = rng.uniform(0, 2 * math.pi, 3)
+        return amp * (0.5 + 0.25 * np.sin(t * 1.3 + ph[0]) + 0.15 * np.sin(t * 3.1 + ph[1]) + 0.1 * np.sin(t * 7.3 + ph[2]))
+
+    u = u + wander(V[:, 0], 0.035)[:, None] * _smoothstep(0.5, 0.0, u)
+    u = u - wander(V[:, 0], 0.035)[:, None] * _smoothstep(0.5, 0.0, u_max - u)
 
     # The torn front edge: pull the first rows back along the tear.
     e = deckle(u[0], rng, dims.DECKLE)
     blend = np.clip(1.0 - V / 0.55, 0.0, 1.0)
     V = V + e[None, :] * blend
+
+    # The top flap layer (s < 0.5) goes round the outside of fold 2 and so
+    # uses pi * LAYER more paper than the layer under it: give it that much,
+    # so the two free edges of the flap line up as one clean edge.
+    left = _smoothstep(0.53, 0.47, S)
+    V = V + math.pi * L * left * _smoothstep(D + 0.8, SH, V)
+    # ...and that edge wanders a little too.
+    V = V - wander(u[-1], 0.04)[None, :] * _smoothstep(SH - 0.6, SH, V)
 
     uv = np.stack([u / SW, V / SH], axis=-1)
 
@@ -132,7 +173,7 @@ def napkin(seed: int = 1, loft: float = 0.14):
     # The flap's free edge lifts a little off the base (only the flap layers,
     # measured from their own edge, so the top one always stays on top).
     in_flap = (V.reshape(-1) > D + 1.0).astype(float)
-    from_edge = SH - V.reshape(-1)
+    from_edge = SH + math.pi * L * left.reshape(-1) - V.reshape(-1)
     z = z + in_flap * 0.09 * _smoothstep(1.6, 0.0, from_edge) * (0.7 + 0.3 * np.sin(X * 0.6 + ph[5]))
 
     # The loose corner at the front left lifts off the table a little.
@@ -144,7 +185,7 @@ def napkin(seed: int = 1, loft: float = 0.14):
     return verts, uv
 
 
-def drape(verts, under, cell: float = 0.2, clearance: float = 0.006):
+def drape(verts, under, cell: float = 0.2, clearance: float = 0.008):
     """Lays a napkin (verts, world XY) over the napkins in `under` (a list of
     vertex arrays): every point is raised by the smoothed height of what lies
     beneath it, so the paper settles over them without touching."""
@@ -158,9 +199,10 @@ def drape(verts, under, cell: float = 0.2, clearance: float = 0.006):
     H = np.zeros(shape)
     ij = np.floor((pts[:, :2] - lo) / cell).astype(int)
     np.maximum.at(H, (ij[:, 0], ij[:, 1]), pts[:, 2] + dims.PLY / 2)
-    # Dilate (so the smoothed field never dips below the paper under it),
-    # then smooth into a gentle drape.
-    r = 2
+    # Dilate (so the smoothed field never dips below the paper under it; one
+    # cell more than the smoothing reaches, for the bilinear sampling), then
+    # smooth into a gentle drape.
+    r = 3
     Hd = H.copy()
     for di in range(-r, r + 1):
         for dj in range(-r, r + 1):

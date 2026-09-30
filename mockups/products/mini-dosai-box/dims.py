@@ -36,11 +36,15 @@ TRAY_H = 2.45  # floor to rim
 TRAY_DRAFT = 0.42  # wall slope: the floor is this much smaller on each side
 TRAY_R = 1.0  # plan corner radius at the rim (outside of the flange)
 
-# ---------------------------------------------------------------- dosa parcels
-DOSA_W = 6.4
-DOSA_L = 3.3
-DOSA_H = 1.55
-DOSA_COUNT = 3
+# ---------------------------------------------------------------- mini dosai
+# Folded mini dosai lying across the tray, as in the photo: each is a crepe
+# rolled round its filling, flattened, with the ends tucked under. The photo's
+# front piece spans about 6.3 cm across the tray and runs back under the
+# sleeve's edge.
+PIECE_L = 5.95  # across the tray (x)
+PIECE_D = 3.5  # front to back (y)
+PIECE_H = 1.85  # height
+PIECES = 3
 
 
 def sleeve_layout(w=W, h=H, r=R):

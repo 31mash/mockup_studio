@@ -48,6 +48,10 @@ def C(cx, cy, r, fill=WH):
     return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}"/>'
 
 
+def ELL(cx, cy, rx, ry, fill=WH):
+    return f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{rx:.1f}" ry="{ry:.1f}" fill="{fill}"/>'
+
+
 def RING(cx, cy, r, w, color=WH):
     return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" stroke="{color}" stroke-width="{w:.1f}"/>'
 
@@ -72,28 +76,28 @@ def TXT(x, y, s, size, fill=BL, weight=700, anchor='middle', spacing=0):
 
 
 def swiss_knife():
-    """Upright, 510 tall: rounded scales, keyring shackle, a blade proud of the
-    right side, tool tips peeking out on the left."""
-    ticks = ''.join(g(R(-14, -4.5, 28, 9, 4.5), -80, y, rot=-16) for y in (-172, -124, -76, -28))
+    """Upright, 550 tall: rounded scales, keyring shackle on top, a folded
+    blade's back along the right side (split off by a knock-out, with its nail
+    nick), four tool tips peeking out of the left side."""
+    tabs = ''.join(g(R(-24, -5.5, 36, 11, 5.5), -76, y, rot=-22) for y in (-196, -150, -104, -58))
     return (
-        ticks
-        + C(-14, -250, 20)
-        + C(-14, -250, 7.5, BL)
-        + R(-70, -255, 140, 510, 70)
-        + P('M 78 -168 C 88 -190 97 -212 103 -228 C 110 -150 107 -60 96 6 Q 90 22 81 14 C 83 -50 83 -118 78 -168 Z')
-        + KO('M 95 -170 L 98 -118')
+        tabs
+        + RING(0, -286, 17, 9)
+        + R(-70, -275, 140, 550, 70)
+        + P('M 75 -214 L 97 -246 Q 101 -250 101 -244 L 101 170 Q 101 196 83 200 L 75 200 Z')
+        + KO('M 90 -176 L 90 -140', w=5)
     )
 
 
 def binder_clip():
     """Body with the wire handles folded up: a keyhole-shaped loop."""
-    handles = WIRE('M -14 -57 C -30 -78 -62 -100 -62 -124 C -62 -150 -32 -160 0 -160 C 32 -160 62 -150 62 -124 C 62 -100 30 -78 14 -57')
+    handles = WIRE('M -13 -62 C -28 -86 -56 -116 -56 -142 C -56 -168 -30 -178 0 -178 C 30 -178 56 -168 56 -142 C 56 -116 28 -86 13 -62')
     return (
         handles
-        + R(-138, -57, 276, 114, 8)
-        + KO('M -14 -57 L -60 46')
-        + KO('M 14 -57 L 60 46')
-        + R(-138, 66, 276, 15, 6)
+        + R(-134, -62, 268, 124, 8)
+        + KO('M -13 -62 L -60 52')
+        + KO('M 13 -62 L 60 52')
+        + R(-134, 72, 268, 14, 6)
     )
 
 
@@ -111,11 +115,11 @@ def whistle():
     """Round chamber with the mouthpiece along its top, tipped down to the left,
     and a small ring for a lanyard."""
     local = (
-        C(0, 0, 80)
-        + P('M -262 -80 L 0 -80 L 0 -34 L -262 -34 Q -268 -34 -268 -40 L -268 -74 Q -268 -80 -262 -80 Z')
-        + R(-70, -84, 34, 18, 2, BL)
+        C(0, 0, 84)
+        + P('M -214 -84 L 0 -84 L 0 -26 L -214 -26 Q -222 -26 -222 -34 L -222 -76 Q -222 -84 -214 -84 Z')
+        + R(-78, -88, 36, 22, 3, BL)
     )
-    return g(local, rot=-32) + RING(62, -72, 15, 8)
+    return g(local, rot=-30) + RING(64, -76, 16, 8)
 
 
 def nail_clipper():
@@ -128,9 +132,10 @@ def nail_clipper():
         + KO('M 66 -6 L 262 -4')
         + KO('M 66 6 L 262 4')
         + R(36, -50, 26, 98, 6)
-        + C(482, 0, 30)
-        + C(490, 0, 10, BL)
-        + RING(534, 0, 42, 9)
+        + C(480, 0, 28)
+        + C(488, 0, 12, BL)
+        + RING(530, 0, 40, 8 + 2 * K, BL)  # a blue edge where the ring crosses the tail
+        + RING(530, 0, 40, 8)
     )
 
 
@@ -159,9 +164,9 @@ def sharpener():
 
 def spinning_top():
     return P(
-        'M -134 0 C -86 -9 -44 -17 -22 -24 C -15 -42 -9 -70 -3 -92 Q 0 -98 3 -92 C 9 -70 15 -42 22 -24 '
-        'C 44 -17 86 -9 134 0 C 86 9 44 19 22 26 C 15 44 9 64 3 82 Q 0 88 -3 82 C -9 64 -15 44 -22 26 '
-        'C -44 19 -86 9 -134 0 Z'
+        'M -136 0 C -88 -10 -46 -18 -24 -26 C -13 -42 -8 -78 -5 -106 Q 0 -114 5 -106 C 8 -78 13 -42 24 -26 '
+        'C 46 -18 88 -10 136 0 C 88 10 46 20 24 28 C 16 42 10 58 4 74 Q 0 81 -4 74 C -10 58 -16 42 -24 28 '
+        'C -46 20 -88 10 -136 0 Z'
     )
 
 
@@ -186,42 +191,36 @@ def key():
 
 # ----------------------------------------------------------------- body icons
 
+IPOD_W = 386  # 0.61 cm round the front-left corner to 3.25 cm along the front
+
 
 def ipod_shuffle():
-    """First-generation iPod shuffle: a long white stick with the round control
-    pad near one end. Origin: the pad end, centreline; the stick runs left."""
-    pad = -155
+    """First-generation iPod shuffle, lying down with its round control pad
+    near the right end. As printed, the white body is cut square at both ends
+    and starts on the front-left corner of the tin. Origin: the right end,
+    centreline."""
+    pad = -150
     # White symbols on the blue ring: + and - above and below, skip marks
     # (two chevrons) left and right; play/pause in blue on the white centre.
     plus_minus = R(pad - 13, -82, 26, 6, 2) + R(pad - 3, -92, 6, 26, 2) + R(pad - 13, 76, 26, 6, 2)
     prev = P(f'M {pad - 70} -11 L {pad - 88} 0 L {pad - 70} 11 Z') + P(f'M {pad - 86} -11 L {pad - 104} 0 L {pad - 86} 11 Z')
     nxt = P(f'M {pad + 70} -11 L {pad + 88} 0 L {pad + 70} 11 Z') + P(f'M {pad + 86} -11 L {pad + 104} 0 L {pad + 86} 11 Z')
     play = P(f'M {pad - 22} -11 L {pad - 4} 0 L {pad - 22} 11 Z', BL) + R(pad + 4, -10, 5, 20, 1, BL) + R(pad + 13, -10, 5, 20, 1, BL)
-    return (
-        R(-675, -125, 675, 250, 36)
-        + KO('M -612 -125 L -612 125')
-        + C(pad, 0, 104, BL)
-        + C(pad, 0, 52)
-        + plus_minus
-        + prev
-        + nxt
-        + play
-    )
+    return R(-IPOD_W, -132, IPOD_W, 264, 5) + C(pad, 0, 104, BL) + C(pad, 0, 52) + plus_minus + prev + nxt + play
 
 
 def paper_clip():
-    return WIRE('M -22 -62 L -22 70 A 22 22 0 0 0 22 70 L 22 -100 A 33.5 33.5 0 0 0 -45 -100 L -45 94 A 45 45 0 0 0 45 94 L 45 -78')
+    """Standing up: pointed outer loop on top, round loop at the bottom, the
+    inner leg ending in a short diagonal tail. Origin: centre."""
+    return WIRE(
+        'M 34 104 L 34 -92 Q 34 -104 27 -112 L 6 -136 Q 0 -142 -6 -136 L -27 -112 Q -34 -104 -34 -92 '
+        'L -34 110 A 28 28 0 0 0 22 110 L 22 -58 A 19 19 0 0 0 -16 -58 L -16 84 Q -16 96 -6 90 L 18 66'
+    )
 
 
 def battery():
     """AA cell lying down, positive end on the left. Origin: the terminal tip."""
-    return (
-        R(0, -31, 24, 62, 6)
-        + R(18, -87, 608, 174, 18)
-        + KO('M 112 -87 L 112 87')
-        + KO('M 50 0 L 80 0')
-        + KO('M 65 -15 L 65 15')
-    )
+    return R(0, -28, 24, 56, 6) + R(18, -80, 582, 160, 16)
 
 
 def dice():
@@ -232,18 +231,18 @@ def dice():
 def safety_pin():
     """Coil on the left, clasp head on the right. Origin: coil centre."""
     return (
-        WIRE('M 14 -16 L 362 -28', w=9)
-        + WIRE('M 14 16 L 356 24', w=9)
-        + RING(0, 0, 19, 9)
-        + P('M 346 -46 L 390 -46 C 414 -46 428 -30 428 -6 C 428 18 414 36 390 38 L 346 38 C 338 16 338 -24 346 -46 Z')
-        + KO('M 372 -12 C 380 -26 404 -24 406 -6 C 408 10 390 18 380 8')
+        WIRE('M 22 -18 L 316 -28', w=9)
+        + WIRE('M 22 18 L 310 24', w=9)
+        + RING(0, 0, 26, 9)
+        + P('M 300 -46 L 344 -46 C 368 -46 382 -30 382 -6 C 382 18 368 36 344 38 L 300 38 C 292 16 292 -24 300 -46 Z')
+        + KO('M 326 -12 C 334 -26 358 -24 360 -6 C 362 10 344 18 334 8')
     )
 
 
 def bobby_pin():
     """Hair grip: straight lower leg, wavy upper leg, ball tips. Origin: the bend."""
-    wave = 'M 500 -14 L 470 -14 Q 452 -24 434 -14 Q 416 -4 398 -14 Q 380 -24 362 -14 Q 344 -4 326 -14 Q 308 -24 290 -14 L 16 -14 A 14 14 0 0 0 16 14 L 500 14'
-    return WIRE(wave, w=9) + C(502, -14, 9.5) + C(502, 14, 9.5)
+    wave = 'M 470 -14 L 440 -14 Q 422 -24 404 -14 Q 386 -4 368 -14 Q 350 -24 332 -14 Q 314 -4 296 -14 Q 278 -24 260 -14 L 16 -14 A 14 14 0 0 0 16 14 L 470 14'
+    return WIRE(wave, w=9) + C(472, -14, 9.5) + C(472, 14, 9.5)
 
 
 def pocket_compass():
@@ -257,6 +256,31 @@ def pocket_compass():
         + P('M 0 -58 L 15 0 L -15 0 Z', BL)
         + KO('M -15 0 L 0 58 L 15 0', w=3.5)
         + C(0, 0, 5)
+    )
+
+
+def scissors():
+    """Closed scissors lying down, points to the right. Origin: the pivot."""
+    return (
+        ELL(-98, -34, 40, 27)
+        + ELL(-98, -34, 26, 14, BL)
+        + ELL(-98, 34, 40, 27)
+        + ELL(-98, 34, 26, 14, BL)
+        + P('M -74 -52 C -52 -36 -30 -20 0 -17 L 0 17 C -30 20 -52 36 -74 52 L -62 14 L -62 -14 Z')
+        + P('M -8 -17 L 184 -4 Q 192 0 184 4 L -8 17 Z')
+        + KO('M 12 0 L 176 0', w=3.5)
+        + C(0, 0, 7, BL)
+    )
+
+
+def torch():
+    """Pocket torch lying down, lamp to the right. Origin: centre."""
+    return (
+        R(-132, -30, 196, 60, 12)
+        + P('M 58 -30 L 96 -46 L 126 -46 Q 134 -46 134 -38 L 134 38 Q 134 46 126 46 L 96 46 L 58 30 Z')
+        + KO('M 104 -46 L 104 46')
+        + R(-46, -42, 36, 14, 5)
+        + ''.join(KO(f'M {x} -30 L {x} 30', w=3.5) for x in (-112, -100, -88))
     )
 
 
@@ -309,10 +333,6 @@ def tape_measure():
         + R(104, 24, 10, 40, 3)
         + R(-22, -60, 44, 12, 4, BL)
     )
-
-
-def eraser():
-    return R(-120, -48, 240, 96, 16) + KO('M -36 -48 L -36 48') + KO('M -24 -48 L -24 48', w=3)
 
 
 def camera():
@@ -388,18 +408,18 @@ def lid_top():
         'IndiGo’s 2nd reusable tin for the 2nd time',
         'in aviation history.',
     ]
-    text = ''.join(TXT(628, 112 + i * 35, s, 26.5, fill=WH, weight=600, anchor='start', spacing=0.2) for i, s in enumerate(lines))
+    text = ''.join(TXT(630, 84 + i * 35.5, s, 26.5, fill=WH, weight=700, anchor='start', spacing=0) for i, s in enumerate(lines))
     icons = (
-        g(swiss_knife(), 150, 334)
-        + g(binder_clip(), 454, 226)
-        + g(usb_stick(), 460, 390)
-        + g(whistle(), 540, 572)
+        g(swiss_knife(), 162, 326)
+        + g(binder_clip(), 462, 206)
+        + g(usb_stick(), 462, 378)
+        + g(whistle(), 540, 566)
         + g(nail_clipper(), 72, 706)
-        + g(pocket_watch(), 800, 486)
-        + g(sharpener(), 1086, 318)
-        + g(spinning_top(), 1060, 540)
-        + g(nail(), 1214, 450)
-        + g(key(), 790, 690)
+        + g(pocket_watch(), 800, 458)
+        + g(sharpener(), 1074, 306)
+        + g(spinning_top(), 1056, 530)
+        + g(nail(), 1208, 440)
+        + g(key(), 790, 688)
     )
     return f'<rect width="{W}" height="{D}" fill="{BL}"/>' + icons + text
 
@@ -410,7 +430,6 @@ bw, bd, br = dims.body_outline()
 LAY = wrap_layout(bw, bd, br)
 L = LAY['length'] * U
 H = (dims.BODY_H - dims.BODY_EDGE) * U
-FRONT_C = (LAY['front'][0] + LAY['front'][1]) / 2 * LAY['length']  # cm along the strip
 
 
 def face_c(face):
@@ -429,24 +448,26 @@ def place(icon, u, z, rot=0.0, s=1.0):
 
 
 def body_side():
-    fc = FRONT_C
+    """Positions in cm: u along the strip from the front face's left end
+    (negative = back round the front-left corner), z above the floor."""
     rc, bc, lc = face_c('right'), face_c('back'), face_c('left')
-    # Front, from the photo: two rows. The iPod runs round the front-left
-    # corner onto the left side; the battery and the pin reach the right corner.
+    # Front, measured from the photo: two rows. The iPod panel starts on the
+    # front-left corner, the hair grip's bend just round it; the battery and
+    # the pin's head reach the front-right corner.
     front = (
-        place(ipod_shuffle(), fc - 2.25, 3.0)
-        + place(paper_clip(), fc - 1.5, 2.75)
-        + place(battery(), fc - 0.63, 3.17)
-        + place(dice(), fc + 0.15, 1.12)
-        + place(safety_pin(), fc + 1.45, 1.12)
-        + place(bobby_pin(), fc - 6.05, 0.93)
+        place(ipod_shuffle(), 3.25, 2.9)
+        + place(paper_clip(), 3.98, 2.67)
+        + place(battery(), 4.75, 3.18)
+        + place(bobby_pin(), -0.44, 0.85)
+        + place(dice(), 5.5, 1.06)
+        + place(safety_pin(), 6.75, 1.06)
     )
     right = (
-        place(sd_card(), rc - 1.85, 3.2)
-        + place(sewing_button(), rc + 0.05, 3.25)
-        + place(push_pin(), rc + 1.9, 3.2)
-        + place(tape_measure(), rc - 1.9, 1.08)
-        + place(eraser(), rc + 1.3, 1.08)
+        place(sd_card(), rc - 2.05, 3.2)
+        + place(sewing_button(), rc - 0.1, 3.25)
+        + place(push_pin(), rc + 1.8, 3.2)
+        + place(tape_measure(), rc - 1.95, 1.08)
+        + place(torch(), rc + 1.05, 1.1)
     )
     back = (
         place(camera(), bc - 3.3, 3.2)
@@ -457,17 +478,20 @@ def body_side():
         + place(needle(), bc + 2.65, 1.1)
     )
     left = (
-        place(pocket_compass(), lc - 0.95, 2.95)
+        place(pocket_compass(), lc - 1.75, 3.0)
+        + place(scissors(), lc + 0.8, 3.15)
         + place(pencil(), lc - 2.75, 0.98)
     )
     content = front + right + back + left
     # The strip is a loop: draw it again one length either side so icons that
     # cross the seam (the iPod, the hair grip) continue at the other end.
-    return f'<rect width="{L}" height="{H}" fill="{BL}"/>' + g(content) + g(content, L) + g(content, -L)
+    # The background overshoots the viewBox (which svg() rounds to whole units).
+    return f'<rect x="-10" y="-10" width="{L + 20}" height="{H + 20}" fill="{BL}"/>' + g(content) + g(content, L) + g(content, -L)
 
 
 if __name__ == '__main__':
     os.makedirs(os.path.join(HERE, 'art'), exist_ok=True)
     open(os.path.join(HERE, 'art', 'lid-top.svg'), 'w').write(svg(W, D, lid_top()))
-    open(os.path.join(HERE, 'art', 'body-side.svg'), 'w').write(svg(L, H, body_side(), px=12288))
+    # Exactly 3 px per unit, so the strip's edge columns are whole pixels.
+    open(os.path.join(HERE, 'art', 'body-side.svg'), 'w').write(svg(L, H, body_side(), px=3 * round(L)))
     print(f'art written: lid {W:.0f}x{D:.0f}, body strip {L:.0f}x{H:.0f} units')

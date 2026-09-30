@@ -21,7 +21,8 @@ LAY = dims.sleeve_layout()
 STRIP = LAY['length'] * U
 
 CREAM = '#f4f1e3'
-SLAB = 'Bevan'
+SLAB = 'Bevan'  # DOSAI: a black Clarendon-style slab
+SLAB_LIGHT = 'Roboto Slab'  # MINI: the same idea, a weight lighter
 TAMIL = 'Noto Serif Tamil'
 BADGE = '#d3c43b'
 BADGE_INK = '#3a2e1c'
@@ -29,20 +30,22 @@ INK = '#221d1a'
 
 VARIANTS = {
     'chicken': dict(
-        ink='#961d24',
+        ink='#86171d',
         badge=(618, 484),
         badge_text=['Chicken', 'kurma and', 'coconut', 'chutney'],
         name='Chicken',
         mark=nonveg_mark,
-        blurb='Crisp mini dosai, folded around a spiced chicken kurma.',
+        blurb='Crisp mini dosai, rolled around a spiced chicken kurma.',
+        ingredients='Rice, black gram, chicken, onion, coconut, curry leaves, oil, spices.',
     ),
     'veg': dict(
-        ink='#2a6236',
+        ink='#20552d',
         badge=(228, 505),
         badge_text=['Aloo', 'podimas and', 'coconut', 'chutney'],
         name='Vegetarian',
         mark=veg_mark,
-        blurb='Crisp mini dosai, folded around a potato podimas.',
+        blurb='Crisp mini dosai, rolled around a potato podimas.',
+        ingredients='Rice, black gram, potato, onion, coconut, curry leaves, oil, spices.',
     ),
 }
 
@@ -77,38 +80,29 @@ def outlined_word(text, cx, baseline, size, sx, ink, gap, ring, family=SLAB, spa
     return g + '</g>'
 
 
-def seal(cx, cy, r, color, teeth=64, depth=2.2):
-    pts = []
-    for i in range(teeth * 2):
-        a = math.pi * i / teeth
-        rr = r if i % 2 == 0 else r - depth
-        pts.append(f'{cx + rr * math.cos(a):.1f},{cy + rr * math.sin(a):.1f}')
-    return f'<polygon points="{" ".join(pts)}" fill="{color}"/>'
-
-
 def front(v):
     """The printed face (top of the sleeve), W x L, back end at the top."""
     ink = v['ink']
     cx = W / 2
     out = [ticket_frame(54, 64, W - 54, L - 54, 50, 6, ink, 5)]
-    out.append(f'<text x="{cx}" y="152" font-family="{SLAB}" font-size="82" text-anchor="middle" fill="{ink}">MINI</text>')
-    out.append(outlined_word('DOSAI', cx, 322, 150, 1.1, ink, gap=9, ring=4.5))
+    out.append(f'<text x="{cx}" y="156" font-family="{SLAB_LIGHT}" font-weight="800" font-size="92" letter-spacing="5" text-anchor="middle" fill="{ink}">MINI</text>')
+    out.append(outlined_word('DOSAI', cx, 322, 150, 1.1, ink, gap=6, ring=3.6))
     # Oval vignette: heavy outer rule, hairline inside.
     ox, oy = cx, 716
-    out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="235" ry="311" fill="none" stroke="{ink}" stroke-width="10"/>')
-    out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="217" ry="293" fill="none" stroke="{ink}" stroke-width="3.5"/>')
+    out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="234" ry="311" fill="none" stroke="{ink}" stroke-width="6.5"/>')
+    out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="222" ry="299" fill="none" stroke="{ink}" stroke-width="3.8"/>')
     if v is VARIANTS['chicken']:
-        out.append(hen(272, 568, 0.985))
+        out.append(hen(247, 569, 1.08))
     else:
-        out.append(potato_plant(318, 452, 1.0))
+        out.append(potato_plant(290, 447, 1.08))
     # Tamil name.
     out.append(
-        f'<text transform="translate({cx},1158) scale(0.86,1)" x="0" y="0" font-family="{TAMIL}" font-weight="800" '
+        f'<text transform="translate({cx},1158) scale(0.86,1)" x="0" y="0" font-family="{TAMIL}" font-weight="900" '
         f'font-size="126" text-anchor="middle" fill="{ink}">தோசை</text>'
     )
     # Yellow seal with the filling, overlapping the oval.
     bx, by = v['badge']
-    out.append(seal(bx, by, 84, BADGE))
+    out.append(f'<circle cx="{bx}" cy="{by}" r="82" fill="{BADGE}"/>')
     lines = v['badge_text']
     lh = 19
     y0 = by - (len(lines) - 1) * lh / 2 + 5
@@ -152,7 +146,7 @@ def bottom(v, w, h):
     out.append(f'<text x="{cx}" y="190" font-family="{SLAB}" font-size="62" text-anchor="middle" fill="{ink}">MINI DOSAI</text>')
     out.append(f'<text x="{cx}" y="250" font-family="Libre Baskerville" font-style="italic" font-size="28" text-anchor="middle" fill="{ink}">{v["blurb"]}</text>')
     rows = [
-        ('Ingredients', 'Rice, black gram, filling, curry leaves, oil, salt, spices.'),
+        ('Ingredients', v['ingredients']),
         ('Storage', 'Keep chilled. Heat on board and serve warm.'),
         ('Allergens', 'Contains mustard. Made in a kitchen that handles nuts.'),
     ]
@@ -176,25 +170,21 @@ def bottom(v, w, h):
 
 def strip(v):
     """The whole sleeve print as one wrap strip (see dims.sleeve_layout)."""
-    fb = LAY['bottom_a'][1] * U
-    lh = (LAY['left'][1] - LAY['left'][0]) * U
+    def centre(panel):
+        return (LAY[panel][0] + LAY[panel][1]) / 2 * U
+
     out = [f'<rect width="{STRIP:.0f}" height="{L:.0f}" fill="{CREAM}"/>']
     # Top: centred on the top panel, full sleeve width.
-    tc = (LAY['top'][0] + LAY['top'][1]) / 2 * U
-    out.append(f'<g transform="translate({tc - W / 2:.1f},0)">{front(v)}</g>')
-    # Left side: panel spans u (bottom -> top), v along the sleeve. Drawn
-    # upright (L wide, h high) then turned so reading runs towards the front.
-    pl0 = LAY['left'][0] * U - dims.R * U * 0.3
+    out.append(f'<g transform="translate({centre("top") - W / 2:.1f},0)">{front(v)}</g>')
+    # Sides: drawn upright (L wide, H high, as seen from outside), then turned
+    # onto the strip, where u runs up the left side and down the right side:
+    # the left side reads towards the front end, the right towards the back.
     hh = dims.H * U
-    out.append(
-        f'<g transform="translate({pl0 + (lh + dims.R * U * 0.6) / 2:.1f},{L / 2:.1f}) rotate(90) translate({-L / 2:.1f},{-hh / 2:.1f})">'
-        f'{side_left(v, L, hh)}</g>'
-    )
-    pr0 = LAY['right'][0] * U - dims.R * U * 0.3
-    out.append(
-        f'<g transform="translate({pr0 + (lh + dims.R * U * 0.6) / 2:.1f},{L / 2:.1f}) rotate(-90) translate({-L / 2:.1f},{-hh / 2:.1f})">'
-        f'{side_right(v, L, hh)}</g>'
-    )
+    for panel, turn, draw in (('left', 90, side_left), ('right', -90, side_right)):
+        out.append(
+            f'<g transform="translate({centre(panel):.1f},{L / 2:.1f}) rotate({turn}) translate({-L / 2:.1f},{-hh / 2:.1f})">'
+            f'{draw(v, L, hh)}</g>'
+        )
     # Bottom: centred on the strip's start (and again at its end).
     for c in (0.0, STRIP):
         out.append(f'<g transform="translate({c - W / 2:.1f},0)">{bottom(v, W, L)}</g>')
@@ -204,7 +194,7 @@ def strip(v):
 if __name__ == '__main__':
     os.makedirs(os.path.join(HERE, 'art'), exist_ok=True)
     for name, v in VARIANTS.items():
-        open(os.path.join(HERE, 'art', f'sleeve-{name}.svg'), 'w').write(svg(STRIP, L, strip(v), px=6144))
+        open(os.path.join(HERE, 'art', f'sleeve-{name}.svg'), 'w').write(svg(STRIP, L, strip(v), px=8192))
         # A flat proof of the printed face alone, for checking the artwork.
         open(os.path.join(HERE, 'art', f'_proof-{name}.svg'), 'w').write(
             svg(W, L, f'<rect width="{W}" height="{L}" fill="{CREAM}"/>' + front(v), px=1700)

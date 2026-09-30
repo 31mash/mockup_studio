@@ -1,7 +1,10 @@
-"""Namkeen pouch artwork: white ink on clear film, laid out on the flat film
-panel (1 unit = 0.1 mm). Transparent pixels stay clear film; the alpha channel
-is ink opacity, so the heat seals are a faint white haze and the copy is solid
-white ink. Run:
+"""Namkeen pouch artwork, laid out on the flat film panel (1 unit = 0.1 mm).
+
+- front.png, back.png: the white ink (alpha = ink; the rest stays clear film).
+  The back is drawn as seen from behind. The heat seals (side and top seals,
+  the gusset's curved corner seals, the zip band) are a faint milky haze.
+
+Run:
 
     python3 products/snack-pouch/make_art.py && node tools/raster.mjs products/snack-pouch/art
 """
@@ -35,9 +38,8 @@ STORY = (
 
 
 def seals_svg() -> str:
-    """Heat seals: a faint frosted haze with the fine crimp lines the sealing
-    jaws leave, on the side seals, the top seal, the zip band and the curved
-    gusset seal at the bottom corners."""
+    """Heat seals: a faint milky haze on the side and top seals, the curved
+    gusset seals at the bottom corners, and a lighter band for the zip."""
     s = dims.SEAL * U
     top = dims.TOP_SEAL * U
     bot = dims.BOTTOM_SEAL * U
@@ -45,15 +47,8 @@ def seals_svg() -> str:
     zg = dims.ZIP_GAP * U
     gc = dims.GUSSET_CURVE * U
     gx = 3.3 * U  # where the gusset curve meets the bottom seal
-    haze = 'rgba(255,255,255,0.17)'
-    crimp = 'rgba(255,255,255,0.13)'
-    pitch = 9
-    parts = [
-        '<defs>'
-        f'<pattern id="crimp" width="{pitch}" height="{pitch}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
-        f'<rect width="{pitch * 0.45}" height="{pitch}" fill="{crimp}"/></pattern>'
-        '</defs>'
-    ]
+    haze = 'rgba(255,255,255,0.1)'
+    parts = []
     shapes = [
         f'<rect x="0" y="0" width="{s}" height="{H}"/>',
         f'<rect x="{W - s}" y="0" width="{s}" height="{H}"/>',
@@ -64,9 +59,9 @@ def seals_svg() -> str:
         f'<path d="M{W - s},{H - gc} C{W - s - 0.2 * U},{H - gc * 0.38} {W - gx * 0.55},{H - bot * 1.05} {W - gx},{H - bot} L{W - s},{H - bot} Z"/>',
     ]
     body = ''.join(shapes)
-    parts.append(f'<g fill="{haze}">{body}</g><g fill="url(#crimp)">{body}</g>')
+    parts.append(f'<g fill="{haze}">{body}</g>')
     # Zip: a faint milky band between the two tracks (the tracks are modelled).
-    parts.append(f'<rect x="{s}" y="{zc - zg / 2}" width="{W - 2 * s}" height="{zg}" fill="rgba(255,255,255,0.07)"/>')
+    parts.append(f'<rect x="{s}" y="{zc - zg / 2}" width="{W - 2 * s}" height="{zg}" fill="rgba(255,255,255,0.05)"/>')
     return ''.join(parts)
 
 
@@ -75,9 +70,9 @@ def page(inner_svg: str, html_body: str = '') -> str:
 <html><head><meta charset="utf-8"><style>
 #art {{ position: relative; overflow: hidden; background: transparent; }}
 #art svg {{ position: absolute; left: 0; top: 0; }}
-.story {{ position: absolute; font-family: '{FONT}'; font-weight: 700; color: rgba(255,255,255,0.97);
+.story {{ position: absolute; font-family: '{FONT}'; font-weight: 700; color: #ffffff;
          font-size: 40px; line-height: 56.5px; text-align: justify; hyphens: none; text-wrap: pretty; }}
-.small {{ position: absolute; font-family: '{FONT}'; font-weight: 700; color: rgba(255,255,255,0.97);
+.small {{ position: absolute; font-family: '{FONT}'; font-weight: 700; color: #ffffff;
          text-align: center; width: 100%; left: 0; }}
 </style></head>
 <body><div id="art" data-width="4096" style="width:{W:.0f}px;height:{H:.0f}px">

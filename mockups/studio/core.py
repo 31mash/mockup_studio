@@ -41,6 +41,8 @@ def rgba(hex_or_tuple, alpha: float = 1.0):
 
 
 def reset() -> None:
+    global _ORIGIN
+    _ORIGIN = None  # the factory reset deletes it
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.unit_settings.system = 'METRIC'
@@ -157,7 +159,11 @@ _ORIGIN = None
 
 def _origin_empty():
     global _ORIGIN
-    if _ORIGIN is None or _ORIGIN.name not in bpy.data.objects:
+    try:
+        alive = _ORIGIN is not None and _ORIGIN.name in bpy.data.objects
+    except ReferenceError:  # removed by a reset
+        alive = False
+    if not alive:
         bpy.ops.object.empty_add(location=(0, 0, 8))
         _ORIGIN = bpy.context.object
         _ORIGIN.name = 'light-target'

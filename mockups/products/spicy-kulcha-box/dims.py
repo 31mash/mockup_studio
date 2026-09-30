@@ -1,9 +1,11 @@
 """Spicy Kulcha matchbox pack, in cm, estimated from the spread.
 
-The pack lies with its long axis along x. The printed sleeve is a paperboard
-tube (label on top, striker panels on the long sides); the white card tray
-slides out towards +x, the end where 'KULCHA' sits on the label. The label is
-a portrait layout whose top ('SPICY') points to -x.
+A box is modelled with its long axis along x. The printed sleeve is a
+paperboard tube (label on top, striker panels on the long sides); the white
+card tray slides out towards +x, the end where 'KULCHA' sits on the label. The
+label is a portrait layout whose top ('SPICY') points to -x. product.py then
+turns each box a quarter turn, so in the scene the tray comes out towards the
+camera (-Y) and the label reads upright from the front.
 """
 
 # Sleeve (outer)
@@ -30,8 +32,15 @@ TT = 0.055  # tray wall (card) thickness
 TB = 0.045  # tray floor thickness
 
 # How far the tray is slid out, per box
-PULL = {'red': 5.0, 'green': 5.6, 'red-back': 3.7}
+PULL = {'red': 5.0, 'green': 5.2, 'red-back': 4.2}
 
-# Kulcha: one flatbread folded in half along x, fold at the back of the tray
-KULCHA_T = 0.95  # one layer of dough
-KULCHA_GAP = 0.12  # inner radius of the fold (a little filling between the layers)
+# The pair, as in the spread: box centres in the scene (x, y). The red box sits
+# to the right of the green one and a little further back.
+PAIR = {'green': (-5.0, -1.6), 'red': (5.0, 1.6)}
+
+# Kulcha: one flatbread folded in half across the tray, the fold at the tray's
+# far end (inside the sleeve), the rounded edges towards its open end
+KULCHA_T = 1.2  # one layer of dough
+KULCHA_GAP = 0.14  # inner radius of the fold (a little filling between the layers)
+KULCHA_BACK = 0.1  # fold to the tray's far wall
+KULCHA_FRONT = 1.2  # the lower layer's edge to the tray's open end

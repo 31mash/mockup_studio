@@ -44,49 +44,56 @@ def _braid(x0, y0, x1, y1, n=7):
     return ''.join(out)
 
 
-def _face():
-    """Head and neck in face-local coordinates: nose tip near (0, 0), the face
-    about 290 wide; y down."""
-    p = []
-    # hair behind the head, falling to the shoulders
-    p.append(
+def _head_back():
+    """Hair behind the head and the neck, in face-local coordinates (nose tip
+    near (0, 0), the face about 290 wide, y down)."""
+    return (
         f'<path d="M-182,-140 C-196,-248 -86,-292 0,-290 C92,-292 198,-244 186,-136 '
-        f'C180,-58 196,40 186,128 C180,178 160,212 126,226 L-126,226 C-166,206 -184,140 -188,52 '
-        f'C-192,-30 -176,-92 -182,-140 Z" fill="{HAIR}"/>'
+        f'C180,-58 196,40 190,150 C186,240 176,300 150,380 L-150,380 C-176,300 -186,220 -190,100 '
+        f'C-192,-10 -176,-92 -182,-140 Z" fill="{HAIR}"/>'
+        # neck, widening into the chest
+        f'<path d="M-64,110 C-62,190 -72,250 -96,330 C-120,390 -150,440 -170,470 L190,470 C170,430 130,380 106,330 C76,250 64,190 64,110 Z" fill="{SKIN}"/>'
+        f'<path d="M-64,130 C-40,196 40,196 64,130 L66,206 C34,236 -34,236 -66,206 Z" fill="{SKIN_SH}"/>'
+        f'<path d="M64,150 C66,230 86,300 118,360 L150,360 C110,300 88,230 86,150 Z" fill="{SKIN_SH}"/>'
     )
-    # neck, with the shadow under the jaw
-    p.append(f'<path d="M-64,120 C-62,190 -70,260 -78,320 L78,320 C70,260 62,190 64,120 Z" fill="{SKIN}"/>')
-    p.append(f'<path d="M-64,130 C-40,196 40,196 64,130 L66,206 C34,236 -34,236 -66,206 Z" fill="{SKIN_SH}"/>')
-    # face
+
+
+def _head_front():
+    """Face, hair framing it, features and jewellery (face-local)."""
+    p = []
     face = (
         'M-140,-150 C-150,-100 -151,-36 -139,22 C-126,92 -82,152 -36,180 '
-        'C-16,192 16,192 36,180 C82,152 126,92 139,22 C151,-36 150,-100 140,-150 Z'
+        'C-16,192 16,192 36,180 C82,152 126,92 139,22 C151,-36 150,-100 140,-150 '
+        'C128,-206 64,-222 0,-222 C-64,-222 -128,-206 -140,-150 Z'
     )
     p.append(f'<path d="{face}" fill="{SKIN}"/>')
-    # modelling on the shadow side (the viewer's right)
-    p.append(f'<path d="M140,-150 C152,-60 146,40 118,108 C96,150 66,172 36,182 C84,140 112,70 116,-10 C119,-70 112,-120 108,-150 Z" fill="{SKIN_SH}"/>')
-    # ears, mostly under the hair, and jhumka earrings
+    # modelling on the shadow side (the viewer's right): a slim crescent
+    p.append(
+        f'<path d="M136,-160 C150,-96 151,-34 139,22 C126,92 82,152 36,180 '
+        f'C74,146 106,90 116,26 C126,-32 124,-96 112,-160 Z" fill="{SKIN_SH}"/>'
+    )
+    # ears, mostly under the hair
     for sx in (-1, 1):
         p.append(f'<ellipse cx="{sx * 146}" cy="-18" rx="16" ry="34" fill="{SKIN_SH if sx > 0 else SKIN}"/>')
-    # front hair: centre parting, swept over the temples
+    # front hair: centre parting, rounded waves over the temples and the ear tops
     p.append(
-        f'<path d="M-168,-96 C-170,-206 -78,-262 0,-262 C78,-262 170,-206 168,-96 '
-        f'C160,-96 154,-84 150,-60 C138,-150 76,-196 6,-194 L0,-184 L-6,-194 '
-        f'C-76,-196 -138,-150 -150,-60 C-154,-84 -160,-96 -168,-96 Z" fill="{HAIR}"/>'
+        f'<path d="M-172,-90 C-176,-212 -80,-266 0,-266 C80,-266 176,-212 172,-90 '
+        f'C170,-60 164,-40 158,-22 C154,-60 148,-100 140,-128 C124,-178 70,-206 8,-206 L0,-196 L-8,-206 '
+        f'C-70,-206 -124,-178 -140,-128 C-148,-100 -154,-60 -158,-22 C-164,-40 -170,-60 -172,-90 Z" fill="{HAIR}"/>'
     )
     # sheen on the hair
     for d in (
-        'M-26,-250 C-80,-246 -128,-214 -148,-160',
-        'M-40,-232 C-86,-222 -120,-194 -134,-150',
-        'M26,-250 C80,-246 128,-214 148,-160',
-        'M44,-230 C92,-220 124,-190 136,-146',
+        'M-24,-252 C-84,-246 -134,-208 -154,-140',
+        'M-44,-230 C-94,-218 -128,-186 -142,-138',
+        'M24,-252 C84,-246 134,-208 154,-140',
+        'M46,-228 C96,-216 128,-184 140,-136',
     ):
         p.append(f'<path d="{d}" fill="none" stroke="{HAIR_HI}" stroke-width="7" stroke-linecap="round"/>')
     # parting with sindoor, and the maang tikka
-    p.append(f'<path d="M0,-262 L0,-190" stroke="{RED}" stroke-width="5" stroke-linecap="round"/>')
-    p.append(f'<path d="M0,-200 L0,-172" stroke="{GOLD_DK}" stroke-width="3"/>')
-    p.append(f'<circle cx="0" cy="-164" r="11" fill="{GOLD}" stroke="{GOLD_DK}" stroke-width="3"/><circle cx="0" cy="-164" r="4.5" fill="{RED}"/>')
-    p.append(f'<path d="M-6,-152 L0,-140 L6,-152 Z" fill="{GOLD}"/>')
+    p.append(f'<path d="M0,-264 L0,-204" stroke="{RED}" stroke-width="5" stroke-linecap="round"/>')
+    p.append(f'<path d="M0,-204 L0,-178" stroke="{GOLD_DK}" stroke-width="3"/>')
+    p.append(f'<circle cx="0" cy="-170" r="11" fill="{GOLD}" stroke="{GOLD_DK}" stroke-width="3"/><circle cx="0" cy="-170" r="4.5" fill="{RED}"/>')
+    p.append(f'<path d="M-6,-158 L0,-146 L6,-158 Z" fill="{GOLD}"/>')
     # brows: thick, arched, tapering to the tail
     for sx in (-1, 1):
         p.append(
@@ -137,37 +144,78 @@ def _face():
     return ''.join(p)
 
 
+def _hand():
+    """Her right hand raised to her hair, back of the hand to us, the four
+    fingers resting on the hair (the thumb hidden in front of her temple);
+    hand-local: wrist at the origin, fingers pointing up (-y)."""
+    out = []
+    # fingers: little, ring, middle, index (x at the knuckle, length, splay, width)
+    for x, length, ang, w in ((-26, 60, -8, 17), (-9, 76, -3, 18.5), (9.5, 82, 1.5, 18.5), (27, 72, 6, 17.5)):
+        out.append(
+            f'<g transform="translate({x},-92) rotate({ang})">'
+            f'<rect x="{-w / 2}" y="{-length}" width="{w}" height="{length + 14}" rx="{w / 2}" fill="{SKIN}" stroke="{SKIN_SH}" stroke-width="3"/>'
+            # the nail, seen from the back of the hand, just short of the tip
+            f'<path d="M{-w * 0.28},{-length + 17} C{-w * 0.28},{-length + 5} {w * 0.28},{-length + 5} {w * 0.28},{-length + 17} Z" fill="{RED}"/>'
+            '</g>'
+        )
+    # the back of the hand over the finger roots, then its shadow side
+    out.append(
+        f'<path d="M-36,0 C-41,-40 -42,-76 -37,-100 C-24,-110 26,-110 39,-100 C44,-76 42,-40 38,0 Z" fill="{SKIN}"/>'
+        f'<path d="M39,-100 C44,-76 42,-40 38,0 L24,0 C29,-40 31,-72 29,-104 C33,-103 36,-102 39,-100 Z" fill="{SKIN_SH}"/>'
+    )
+    # glass and gold bangles
+    out.append(
+        f'<rect x="-44" y="-6" width="90" height="11" rx="5" fill="{GOLD}" stroke="{GOLD_DK}" stroke-width="2"/>'
+        f'<rect x="-46" y="6" width="94" height="10" rx="5" fill="{RED}" stroke="{GOLD_DK}" stroke-width="2"/>'
+        f'<rect x="-48" y="17" width="98" height="11" rx="5" fill="{GOLD}" stroke="{GOLD_DK}" stroke-width="2"/>'
+    )
+    return ''.join(out)
+
+
 def portrait(rx, ry, bg, uid):
-    """The whole oval picture: background, shoulders, shawl, braid and head."""
+    """The whole oval picture: background, shoulders, shawl, plait, raised
+    hand and head."""
     s = []
     s.append(f'<rect x="{-rx}" y="{-ry}" width="{2 * rx}" height="{2 * ry}" fill="{bg}"/>')
     # soft halo behind the head, in a lighter tint of the background
     s.append(f'<ellipse cx="-10" cy="-70" rx="{rx * 0.78}" ry="{ry * 0.62}" fill="#ffffff" fill-opacity="0.12"/>')
     s.append(
-        f'<defs><pattern id="hatch-{uid}" patternUnits="userSpaceOnUse" width="11" height="11" patternTransform="rotate(38)">'
-        f'<rect width="11" height="11" fill="{SHAWL}"/><rect width="4.4" height="11" fill="{SHAWL_HI}"/></pattern></defs>'
+        f'<defs><pattern id="hatch-{uid}" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(38)">'
+        f'<rect width="9" height="9" fill="{SHAWL}"/><rect width="3" height="9" fill="{SHAWL_HI}"/></pattern></defs>'
     )
-    # blouse
-    s.append(f'<path d="M-320,{ry} L-320,250 C-250,186 -150,168 -60,168 L130,168 C210,172 280,196 330,250 L330,{ry} Z" fill="{RED}"/>')
-    # head and neck, tilted, pivoting on the base of the neck
-    nx, ny = 34, 186
-    face = f'<g transform="translate({nx},{ny}) rotate(-9) scale(0.78) translate(0,-300)">{_face()}</g>'
-    s.append(face)
-    # neckline: skin V into the blouse, with a gold choker
-    s.append(f'<path d="M-30,168 L108,168 L46,262 Z" fill="{SKIN}"/>')
-    s.append(f'<path d="M-24,172 C10,200 70,200 102,168" fill="none" stroke="{GOLD}" stroke-width="10" stroke-linecap="round"/>')
+    head = 'translate(34,186) rotate(-9) scale(0.78) translate(0,-300)'
+    s.append(f'<g transform="{head}">{_head_back()}</g>')
+    # blouse, with a V neckline and gold trim
+    s.append(
+        f'<path d="M-330,{ry + 10} L-330,250 C-250,186 -150,170 -60,170 L-34,170 L46,264 L120,170 '
+        f'C210,172 280,196 330,250 L330,{ry + 10} Z" fill="{RED}"/>'
+    )
+    s.append(f'<path d="M-34,170 L46,264 L120,170" fill="none" stroke="{GOLD}" stroke-width="7" stroke-linejoin="round"/>')
+    # gold choker
+    s.append(f'<path d="M-22,150 C12,186 74,184 106,146" fill="none" stroke="{GOLD}" stroke-width="10" stroke-linecap="round"/>')
     for k in range(7):
         t = k / 6
-        x = -16 + 110 * t
-        y = 176 + 22 * math.sin(math.pi * t)
-        s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{RED if k % 2 else GOLD}" stroke="{GOLD_DK}" stroke-width="1.5"/>')
-    # blouse trim along the neckline
-    s.append(f'<path d="M-30,168 L46,262 L108,168" fill="none" stroke="{GOLD}" stroke-width="6" stroke-linejoin="round"/>')
+        x = -14 + 114 * t
+        y = 160 + 24 * math.sin(math.pi * t) - 6 * t
+        s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5.5" fill="{RED if k % 2 else GOLD}" stroke="{GOLD_DK}" stroke-width="1.5"/>')
     # shawl over her right shoulder (the viewer's left), with a dotted gold border
-    shawl = f'M-330,96 C-250,110 -170,150 -118,190 C-60,236 -18,282 12,{ry + 10} L-330,{ry + 10} Z'
-    s.append(f'<path d="{shawl}" fill="url(#hatch-{uid})"/>')
-    s.append(f'<path d="M-330,96 C-250,110 -170,150 -118,190 C-60,236 -18,282 12,{ry + 10}" fill="none" stroke="{GOLD}" stroke-width="8"/>')
-    s.append(f'<path d="M-330,114 C-256,128 -180,166 -130,206 C-76,250 -36,294 -8,{ry + 10}" fill="none" stroke="{GOLD}" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>')
+    edge = f'M-330,96 C-250,110 -170,150 -118,190 C-60,236 -18,282 12,{ry + 10}'
+    s.append(f'<path d="{edge} L-330,{ry + 10} Z" fill="url(#hatch-{uid})"/>')
+    s.append(f'<path d="{edge}" fill="none" stroke="{GOLD}" stroke-width="8"/>')
+    s.append(
+        f'<path d="M-330,114 C-256,128 -180,166 -130,206 C-76,250 -36,294 -8,{ry + 10}" fill="none" '
+        f'stroke="{GOLD}" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>'
+    )
     # plait over her left shoulder (the viewer's right)
     s.append(_braid(150, 70, 214, 300, n=6))
+    # head
+    s.append(f'<g transform="{head}">{_head_front()}</g>')
+    # raised hand at her temple; the forearm wrapped in the shawl
+    hand = 'translate(-206,-8) rotate(18) scale(0.86)'
+    s.append(
+        f'<g transform="{hand}">'
+        f'<path d="M-50,22 L52,22 C60,140 70,260 60,420 L-120,420 C-96,260 -70,140 -50,22 Z" fill="url(#hatch-{uid})"/>'
+        f'<path d="M-50,22 L52,22" stroke="{GOLD}" stroke-width="9"/>'
+        f'{_hand()}</g>'
+    )
     return ''.join(s)

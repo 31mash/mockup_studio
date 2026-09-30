@@ -5,6 +5,7 @@ Files:
   top-red.svg, top-green.svg   sleeve top: white card with the vintage matchbox
                                label, portrait, 'SPICY' at the top (the -x end)
   side.svg                     sleeve long side: brown striker panel on white card
+The portrait is drawn in portrait.py; --proof also writes art/_portrait-proof.svg.
 """
 
 import math
@@ -14,9 +15,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..'))
 
-from brand.indigo import FONT, INDIGO_BLUE, plane_svg, svg  # noqa: E402
+from brand.indigo import FONT, plane_svg, svg  # noqa: E402
 
 import dims  # noqa: E402
+from lettering import word  # noqa: E402
 from portrait import portrait  # noqa: E402
 
 U = 100
@@ -53,22 +55,16 @@ def label(cw):
     out.append(
         f'<path d="M{ins},{yel_bot} L{ins},{arch_side} Q{lw / 2},{ctrl} {lw - ins},{arch_side} L{lw - ins},{yel_bot} Z" fill="{YELLOW}"/>'
     )
-    # SPICY: white slab capitals on the colour band
-    out.append(
-        f'<text x="{lw / 2}" y="{0.178 * lh}" text-anchor="middle" font-family="Alfa Slab One" font-size="{1.72 * U}" '
-        f'fill="{PAPER}" textLength="{lw - 2 * 62}" lengthAdjust="spacingAndGlyphs" '
-        f'transform="translate(0,{0.178 * lh}) scale(1,1.12) translate(0,{-0.178 * lh})">SPICY</text>'
-    )
+    # SPICY: white block capitals on the colour band, with a fine dark keyline
+    sw, sh = lw - 2 * 96, 1.42 * U
+    out.append(word('SPICY', (lw - sw) / 2, 0.052 * lh + 12, sw, sh, PAPER, keyline=c['ring'], keyline_w=4))
     # white KULCHA panel with a navy keyline
     out.append(f'<rect x="{ins}" y="{pan_top}" width="{lw - 2 * ins}" height="{pan_bot - pan_top}" fill="{PAPER}"/>')
     out.append(
         f'<rect x="{ins + 9}" y="{pan_top + 9}" width="{lw - 2 * ins - 18}" height="{pan_bot - pan_top - 18}" fill="none" stroke="{NAVY}" stroke-width="3.5"/>'
     )
-    kb = pan_top + (pan_bot - pan_top) * 0.8
-    out.append(
-        f'<text x="{lw / 2}" y="{kb}" text-anchor="middle" font-family="Archivo Black" font-size="{1.5 * U}" '
-        f'fill="{NAVY}" textLength="{lw - 2 * ins - 70}" lengthAdjust="spacingAndGlyphs">KULCHA</text>'
-    )
+    kw, kh = lw - 2 * ins - 2 * 64, 0.98 * U
+    out.append(word('KULCHA', (lw - kw) / 2, (pan_top + pan_bot - kh) / 2, kw, kh, NAVY))
     # the portrait in its ringed oval
     ox, oy = lw / 2, 0.487 * lh
     rx, ry = 0.372 * lw, 0.246 * lh
@@ -94,24 +90,27 @@ def label(cw):
 
 
 def emblem(cx, cy, r, cw):
-    """A round seal: IndiGo blue ring with lettering, white centre, '6E'."""
-    rt = r * 0.79  # text baseline radius
+    """A round seal, as in the original: a white ring lettered in navy, a
+    navy-ringed white centre and a bold '6E', IndiGo's flight code."""
+    rt = r * 0.76  # upper text baseline radius
     top = f'M{cx - rt},{cy} A{rt},{rt} 0 0 1 {cx + rt},{cy}'
-    rb = r * 0.79 + 13
+    rb = r * 0.76 + 14
     bot = f'M{cx - rb},{cy} A{rb},{rb} 0 0 0 {cx + rb},{cy}'
+    ring = PAPER
     return (
-        f'<circle cx="{cx}" cy="{cy}" r="{r + 5}" fill="{NAVY}"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="{r + 1}" fill="{PAPER}"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="{r - 5}" fill="{INDIGO_BLUE}"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="{r * 0.62}" fill="{PAPER}"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="{r * 0.62 - 7}" fill="none" stroke="{INDIGO_BLUE}" stroke-width="2.5"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r + 4}" fill="{NAVY}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{PAPER}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r - 7}" fill="{ring}" stroke="{NAVY}" stroke-width="2.5"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r * 0.6}" fill="{NAVY}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r * 0.6 - 6}" fill="{PAPER}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r * 0.6 - 11}" fill="none" stroke="{NAVY}" stroke-width="2"/>'
         f'<path id="em-top-{cw}" d="{top}" fill="none"/><path id="em-bot-{cw}" d="{bot}" fill="none"/>'
-        f'<text font-family="{FONT}" font-weight="700" font-size="{r * 0.21}" letter-spacing="3" fill="{PAPER}">'
+        f'<text font-family="{FONT}" font-weight="700" font-size="{r * 0.2}" letter-spacing="3" fill="{NAVY}">'
         f'<textPath href="#em-top-{cw}" startOffset="50%" text-anchor="middle">INDIGO</textPath></text>'
-        f'<text font-family="{FONT}" font-weight="700" font-size="{r * 0.17}" letter-spacing="2.5" fill="{PAPER}">'
+        f'<text font-family="{FONT}" font-weight="700" font-size="{r * 0.16}" letter-spacing="2.5" fill="{NAVY}">'
         f'<textPath href="#em-bot-{cw}" startOffset="50%" text-anchor="middle">SINCE 2006</textPath></text>'
-        f'<circle cx="{cx - r * 0.79}" cy="{cy + 4}" r="4" fill="{PAPER}"/><circle cx="{cx + r * 0.79}" cy="{cy + 4}" r="4" fill="{PAPER}"/>'
-        f'<text x="{cx}" y="{cy + r * 0.24}" text-anchor="middle" font-family="Alfa Slab One" font-size="{r * 0.72}" fill="{INDIGO_BLUE}">6E</text>'
+        f'<circle cx="{cx - r * 0.8}" cy="{cy + 4}" r="4" fill="{NAVY}"/><circle cx="{cx + r * 0.8}" cy="{cy + 4}" r="4" fill="{NAVY}"/>'
+        f'<text x="{cx}" y="{cy + r * 0.23}" text-anchor="middle" font-family="Alfa Slab One" font-size="{r * 0.66}" fill="{NAVY}">6E</text>'
     )
 
 
@@ -132,9 +131,9 @@ def side():
     defs = (
         '<defs>'
         '<pattern id="knurl" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(45)">'
-        '<rect width="9" height="9" fill="#8b6f66"/>'
-        '<rect width="9" height="2.2" fill="#6c524b"/><rect width="2.2" height="9" fill="#6c524b"/>'
-        '<rect x="4" y="4" width="2.4" height="2.4" fill="#9c8177"/>'
+        '<rect width="9" height="9" fill="#937762"/>'
+        '<rect width="9" height="2.2" fill="#6e5645"/><rect width="2.2" height="9" fill="#6e5645"/>'
+        '<rect x="4" y="4" width="2.4" height="2.4" fill="#a68b74"/>'
         '</pattern>'
         '<filter id="grit" x="0" y="0" width="1" height="1">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.35" numOctaves="2" seed="7" result="n"/>'
@@ -160,10 +159,10 @@ if __name__ == '__main__':
     for cw in COLOURWAYS:
         write(f'top-{cw}.svg', top(cw))
     write('side.svg', side())
-    # a stand-alone proof of the portrait, for checking the drawing
-    rx, ry = dims.LABEL_W * U * 0.372 - 12, dims.LABEL_H * U * 0.246 - 12
-    write(
-        '_portrait-proof.svg',
-        svg(2 * rx, 2 * ry, f'<g transform="translate({rx},{ry})">{portrait(rx, ry, COLOURWAYS["red"]["oval"], "proof")}</g>', px=1600),
-    )
+    if '--proof' in sys.argv:  # a stand-alone proof of the portrait, for checking the drawing
+        rx, ry = dims.LABEL_W * U * 0.372 - 12, dims.LABEL_H * U * 0.246 - 12
+        write(
+            '_portrait-proof.svg',
+            svg(2 * rx, 2 * ry, f'<g transform="translate({rx},{ry})">{portrait(rx, ry, COLOURWAYS["red"]["oval"], "proof")}</g>', px=1600),
+        )
     print('art written')

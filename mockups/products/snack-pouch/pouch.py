@@ -95,6 +95,12 @@ def half_width(b: float) -> float:
 ZT = np.linspace(0.0, dims.Z_TOP, 900)
 BT = depth(ZT)
 AT = np.array([half_width(b) for b in BT])
+# Over the gusset the seals keep the width they have just above it.
+_g0, _g1 = dims.GUSSET_Z
+_a1 = float(np.interp(_g1, ZT, AT))
+_blend = np.clip((ZT - _g0) / (_g1 - _g0), 0.0, 1.0)
+_blend = _blend * _blend * (3 - 2 * _blend)
+AT = np.where(ZT < _g1, _a1 * (0.985 + 0.015 * _blend), AT)
 
 
 def a_at(z):
@@ -112,18 +118,25 @@ def fill_top(x):
     return dims.FILL + 0.28 * np.sin(1.25 * x + 0.6) + 0.18 * np.sin(2.7 * x + 2.1) - 0.09 * x
 
 
+DBT = np.gradient(BT, ZT)
+
+
 def inside(p, margin):
     """True where points p (N x 3) sit inside the film by at least `margin`
-    (per point or scalar) and below the fill surface."""
+    (per point or scalar, measured along the film's normal) and below the
+    fill surface."""
     p = np.atleast_2d(p)
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     a = a_at(z)
     b = b_at(z)
-    ax = np.abs(x) + margin * 1.15
-    ok = ax < a
-    lim = b * g(ax / a) - margin
-    ok &= np.abs(y) < lim
-    ok &= z - margin > 0.22
+    t = np.clip(np.abs(x) / a, 0.0, 0.9999)
+    gt = g(t)
+    dg = -2 * LENS_P * t * (1 - t * t) ** (LENS_P - 1)
+    sx = b * dg / a
+    sz = np.interp(z, ZT, DBT) * gt
+    gap = (b * gt - np.abs(y)) / np.sqrt(1 + sx * sx + sz * sz)
+    ok = (np.abs(x) < a - margin) & (gap > margin)
+    ok &= z - margin > 0.17  # the gusset base, which rises a little in the middle
     ok &= z + margin * 0.6 < fill_top(x)
     return ok
 
@@ -136,18 +149,20 @@ def surface(side: int, xi, z):
     return np.stack([a * xi, side * b * g(xi), np.broadcast_to(z, np.shape(xi))], axis=-1)
 
 
-def surface_frame(side: int, xi: float, z: float):
-    """Point, outward normal and the two tangents (across, up) on the film."""
+def surface_frames(side: int, xi, z):
+    """Points, outward normals and unit tangents (across, up) on the film for
+    arrays of lens parameters xi and heights z."""
     e = 1e-3
+    xi = np.asarray(xi, float)
+    z = np.asarray(z, float)
     p = surface(side, xi, z)
-    tx = surface(side, min(xi + e, 0.999), z) - surface(side, max(xi - e, -0.999), z)
-    tz = surface(side, xi, z + e) - surface(side, xi, max(z - e, 0.0))
-    tx /= np.linalg.norm(tx)
-    tz /= np.linalg.norm(tz)
+    tx = surface(side, np.minimum(xi + e, 0.999), z) - surface(side, np.maximum(xi - e, -0.999), z)
+    tz = surface(side, xi, z + e) - surface(side, xi, np.maximum(z - e, 0.0))
+    tx /= np.linalg.norm(tx, axis=-1, keepdims=True)
+    tz /= np.linalg.norm(tz, axis=-1, keepdims=True)
     n = np.cross(tx, tz)
-    n /= np.linalg.norm(n)
-    if n[1] * side < 0:
-        n = -n
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    n *= np.where(n[:, 1:2] * side < 0, -1.0, 1.0)
     return p, n, tx, tz
 
 
@@ -279,7 +294,7 @@ def build_film(front_mat, back_mat, base_mat):
     Pf, UVf = panel_grid(-1, seed=0.0)
     Pb, UVb = panel_grid(+1, seed=5.0)
     front = grid_object('pouch-front', Pf, UVf, [front_mat])
-    back = grid_object('pouch-back', Pb, UVb, [back_mat], flip=True)
+    back = grid_object('pouch-back', Pb, UVb, [back_mat])
 
     # Gusset base: joins the two bottom rows, its middle fold pushed up a
     # little so the pouch stands on the rim of the oval.
@@ -287,41 +302,56 @@ def build_film(front_mat, back_mat, base_mat):
     b0 = Pb[0][::-1]
     mid = 0.5 * (f0 + b0)
     xi = np.clip(np.abs(mid[:, 0]) / (np.abs(mid[:, 0]).max() + 1e-6), 0, 1)
-    mid[:, 2] = 0.28 * (1 - xi ** 2)
+    mid[:, 2] = 0.13 * (1 - xi ** 2)
     q1 = 0.5 * (f0 + mid)
-    q1[:, 2] = 0.12 * (1 - xi ** 2)
+    q1[:, 2] = 0.06 * (1 - xi ** 2)
     q2 = 0.5 * (b0 + mid)
-    q2[:, 2] = 0.12 * (1 - xi ** 2)
+    q2[:, 2] = 0.06 * (1 - xi ** 2)
     G = np.stack([f0, q1, mid, q2, b0])
     UVg = np.zeros(G.shape[:2] + (2,))
     base = grid_object('pouch-base', G, UVg, [base_mat], flip=True)
     return front, back, base
 
 
-def build_zip(mat):
-    """Two zip tracks on the inside of each panel: thin milky ridges."""
-    import bpy
+def sheet_grid(ob):
+    """The vertex grid (rows x cols x 3) of a panel built by build_film."""
+    rows, cols = len(_rows()), len(_columns())
+    co = np.empty(len(ob.data.vertices) * 3)
+    ob.data.vertices.foreach_get('co', co)
+    return co.reshape(rows, cols, 3)
 
-    from mathutils import Vector  # noqa: F401
+
+def _row_at(grid, z):
+    """The panel's row at height z (rows are level, so interpolate by z)."""
+    zs = grid[:, 0, 2]
+    k = int(np.clip(np.searchsorted(zs, z) - 1, 0, len(zs) - 2))
+    t = (z - zs[k]) / (zs[k + 1] - zs[k])
+    return grid[k] * (1 - t) + grid[k + 1] * t
+
+
+def build_zip(mat, front, back):
+    """Two zip tracks welded inside each panel: thin milky ridges that
+    follow the film, crushed flat where they run into the side seals."""
+    import bpy
 
     objs = []
     zc = dims.Z_TOP - dims.ZIP
-    us = np.linspace(0.12, dims.W - 0.12, 140)
-    for side in (-1, 1):
+    us = _columns()
+    for side, sheet in ((-1, front), (1, back)):
+        grid = sheet_grid(sheet)
         for dz in (-dims.ZIP_GAP / 2, dims.ZIP_GAP / 2):
-            z = zc + dz
-            path = _row_points(side, z, us)
-            # Inside the film, towards the middle.
-            path[:, 1] -= side * 0.035
+            path = _row_at(grid, zc + dz)[1:-1].copy()
+            u = us[1:-1] if side < 0 else (dims.W - us[1:-1])
+            path[:, 1] -= side * 0.004
             ring = 8
             ry, rz = 0.028, 0.075
             verts = []
-            for k, p in enumerate(path):
-                edge = min(us[k], dims.W - us[k])
-                squash = np.clip((edge - 0.1) / 0.6, 0.25, 1.0)  # crushed flat in the seals
+            for k, pt in enumerate(path):
+                edge = min(u[k], dims.W - u[k])
+                squash = np.clip((edge - 0.1) / 0.6, 0.25, 1.0)
                 for j in range(ring):
                     t = 2 * math.pi * j / ring
-                    verts.append((p[0], p[1] - side * (ry * squash * (1 + math.cos(t))), p[2] + rz * math.sin(t)))
+                    verts.append((pt[0], pt[1] - side * (ry * squash * (1 + math.cos(t))), pt[2] + rz * math.sin(t)))
             faces = []
             n = len(path)
             for k in range(n - 1):
@@ -341,6 +371,25 @@ def build_zip(mat):
     return objs
 
 
+CORE_BOTTOM = 0.95  # leaves room for sticks lying on the gusset
+CORE_TOP_GAP = 0.8  # and for the sticks lying on top of the heap
+
+
+def core_hits(pts, margin, inset_y, inset_x):
+    """True where points come within `margin` of the hidden core that
+    build_core makes with the same insets."""
+    x, y, z = pts[:, 0], pts[:, 1], pts[:, 2]
+    a = a_at(z) - inset_x
+    b = np.maximum(0.12, b_at(z) - inset_y)
+    lens = b * g(np.abs(x) / np.maximum(a, 0.1)) ** 0.9
+    return (
+        (z > CORE_BOTTOM - margin)
+        & (z < np.minimum(dims.FILL - 0.25, fill_top(x) - CORE_TOP_GAP + 0.15) + margin)
+        & (np.abs(x) < a + margin)
+        & (np.abs(y) < lens + margin)
+    )
+
+
 def build_core(mat, inset_y=0.62, inset_x=0.75):
     """A closed lens-shaped body inside the sticks, following the pouch but
     smaller, with a bumpy top under the fill surface. Seen only through the
@@ -349,7 +398,7 @@ def build_core(mat, inset_y=0.62, inset_x=0.75):
 
     from mathutils import Vector, noise
 
-    zs = np.linspace(0.45, dims.FILL - 0.25, 44)
+    zs = np.linspace(CORE_BOTTOM, dims.FILL - 0.25, 44)
     t = np.linspace(-1, 1, 49)[1:-1]
     rings = []
     for z in zs:
@@ -360,7 +409,7 @@ def build_core(mat, inset_y=0.62, inset_x=0.75):
         pts = [(-a, 0.0)] + front + [(a, 0.0)] + back
         ring = []
         for x, y in pts:
-            top = float(fill_top(x)) - 0.55
+            top = float(fill_top(x)) - CORE_TOP_GAP
             zz = min(z, top + 0.15 * noise.noise(Vector((x * 1.3, y * 1.3, 2.0))))
             ring.append((x, y, zz))
         rings.append(ring)
@@ -380,4 +429,41 @@ def build_core(mat, inset_y=0.62, inset_x=0.75):
     ob = bpy.data.objects.new('namkeen-core', me)
     bpy.context.collection.objects.link(ob)
     me.materials.append(mat)
+    return ob
+
+
+def build_edges(front, mat, radius=0.014):
+    """The cut edge of the sealed film around the sides and top: a hairline
+    of doubled film that catches the light and outlines the clear pouch."""
+    import bpy
+
+    co = sheet_grid(front)
+    # Up the left edge, across the top, down the right edge; midway between
+    # the two sealed layers.
+    path = np.concatenate([co[:, 0], co[-1, 1:], co[-2::-1, -1]])
+    path[:, 1] += dims.FILM
+    path[:, 2] = np.maximum(path[:, 2], radius)  # stands on the floor, not in it
+    ring = 6
+    verts = []
+    for k, p in enumerate(path):
+        a = path[min(k + 1, len(path) - 1)] - path[max(k - 1, 0)]
+        a /= np.linalg.norm(a)
+        u = np.array([0.0, 1.0, 0.0])
+        v = np.cross(a, u)
+        for j in range(ring):
+            t = 2 * math.pi * j / ring
+            verts.append(tuple(p + radius * (math.cos(t) * u + math.sin(t) * v)))
+    faces = []
+    n = len(path)
+    for k in range(n - 1):
+        for j in range(ring):
+            j2 = (j + 1) % ring
+            faces.append((k * ring + j, k * ring + j2, (k + 1) * ring + j2, (k + 1) * ring + j))
+    me2 = bpy.data.meshes.new('pouch-edge')
+    me2.from_pydata(verts, [], faces)
+    me2.polygons.foreach_set('use_smooth', [True] * len(me2.polygons))
+    me2.update()
+    ob = bpy.data.objects.new('pouch-edge', me2)
+    bpy.context.collection.objects.link(ob)
+    me2.materials.append(mat)
     return ob

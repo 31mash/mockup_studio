@@ -2,9 +2,10 @@
 Run: python3 products/smoked-almonds-tin/make_art.py && node tools/raster.mjs products/smoked-almonds-tin/art
 
 lid-top.svg  the lid seen from above, front edge at the bottom: a pile of
-             almonds drawn in fine bronze line art on print black, a thin
-             bronze ring near the edge, "Smoked Almonds" knocked out across
-             the pile on the diagonal, and the veg mark turned to match.
+             almonds engraved in bronze line art on print black (grooves cut
+             heavier on each nut's shadow side), a thin bronze ring near the
+             edge, "Smoked Almonds" knocked out across the pile on the
+             diagonal, and the veg mark turned to match.
 lid-ink.svg  the same drawing as a mask, white where the metallic bronze ink
              is printed. product.py uses it to make only that ink metallic.
 """
@@ -25,22 +26,22 @@ U = 100  # units per cm
 S = 2 * dims.R * U  # the lid-top image spans the lid's full width
 C = S / 2
 
-BLACK = '#141519'  # print black
-BRONZE = '#bd935f'  # metallic bronze ink (its colour when it reflects white)
+BLACK = '#0e1015'  # print black: a deep, slightly cool rich black
+BRONZE = '#b99569'  # metallic bronze ink (its colour when it reflects white)
 
-# Title in IndiGo's rounded lettering (Comfortaa SemiBold, with IndiGo's arched
+# Title in IndiGo's rounded lettering (Comfortaa Bold, with IndiGo's arched
 # capital A drawn in), two left-aligned lines running up to the right.
-# Positions measured on the photo, rectified to a top view.
-TITLE_ANGLE = 47  # degrees, anticlockwise
-TITLE_CENTRE = (-0.15, -0.5)  # cm from the lid centre; x right, y to the front
+# Positions matched on the photo by overlaying a render from its angle.
+TITLE_ANGLE = 49  # degrees, anticlockwise
+TITLE_CENTRE = (-0.25, -0.2)  # cm from the lid centre; x right, y to the front
 F = 1.28 * U  # font size
 TRACK = 0.075 * F  # letter spacing
 CAP = 0.655 * F  # Comfortaa cap height
-STEM = 0.1 * F  # Comfortaa SemiBold stem weight
-HALO = 0.022 * U  # black keyline that keeps the almond lines off the letters
+STEM = 0.115 * F  # Comfortaa Bold stem weight
+HALO = 0.018 * U  # black keyline that keeps the almond lines off the letters
 
-VEG = (-2.2, 3.5)  # veg mark centre, cm from the lid centre (front-left)
-VEG_SIZE = 0.5 * U
+VEG = (-1.95, 3.75)  # veg mark centre, cm from the lid centre (front-left)
+VEG_SIZE = 0.6 * U
 PILE = (0.45, -0.35, 5.0)  # centre (cm) and reach of the almond pile
 
 
@@ -51,15 +52,27 @@ def fmt(pts):
 # ----------------------------------------------------------------- almonds
 
 
+LIGHT = (-0.6, -0.8)  # engraver's light, from the back-left (SVG y points to the front)
+
+
+def wobble(rng, cycles, amp):
+    """A smooth random wiggle along a line (s in 0..1), zero at both ends."""
+    waves = [(rng.uniform(cycles * 0.6, cycles * 1.4), rng.uniform(0, 2 * math.pi), rng.uniform(0.5, 1.0)) for _ in range(3)]
+    norm = sum(w for _, _, w in waves)
+    return lambda s: amp * math.sin(math.pi * s) * sum(w * math.sin(2 * math.pi * f * s + p) for f, p, w in waves) / norm
+
+
 def almond(rng, L, W):
-    """One almond in local cm, long axis along +x (blunt base at -x, tip at +x).
-    Returns its outline and its skin ridges, drawn like an engraving: lines
-    that run the length of the nut like meridians, with a shared ripple for
-    the wrinkled skin, and staggered ends so they never clot at base or tip."""
-    bend = rng.uniform(-0.04, 0.04)
-    asym = rng.uniform(-0.05, 0.05)
-    p_base = rng.uniform(0.45, 0.55)
-    p_tip = rng.uniform(0.62, 0.78)
+    """One almond in local cm, long axis along +x (round base at -x, pointed
+    tip at +x). Returns its outline and its skin grooves, drawn like an
+    engraving: lines that run the length of the nut like meridians, each
+    with its own slight crinkle and now and then a break, ends staggered so
+    they never clot at the tip. Each groove is (points, side) where side is -1..1
+    across the nut, so the caller can weight lines for shading."""
+    bend = rng.uniform(-0.035, 0.035)
+    asym = rng.uniform(-0.04, 0.04)
+    p_base = rng.uniform(0.50, 0.58)
+    p_tip = rng.uniform(0.74, 0.86)
 
     def prof(s):
         return s**p_base * (1 - s) ** p_tip
@@ -80,25 +93,35 @@ def almond(rng, L, W):
     ss = [(1 - math.cos(math.pi * i / N)) / 2 for i in range(N + 1)]
     outline = [point(s, hw(s, 1)) for s in ss] + [point(s, -hw(s, -1)) for s in reversed(ss[1:-1])]
 
-    n = max(14, round(W / 0.06))
-    theta = math.radians(80)
-    phase = rng.uniform(0, 2 * math.pi)
-    freq = rng.uniform(2.0, 3.2)
-    amp = rng.uniform(0.01, 0.017)
+    n = max(16, round(W / 0.058))
+    theta = math.radians(78)
+    shared = wobble(rng, 2.5, 0.010)  # the skin's broad wrinkles, shared by neighbours
     lines = []
-    M = 56
+    M = 48
     for k in range(n):
         t = math.sin(-theta + 2 * theta * (k + 0.5) / n)
         side = 1 if t > 0 else -1
-        stag = (k % 2) * rng.uniform(0.03, 0.07)
-        s0 = 0.03 + 0.05 * abs(t) + 0.6 * stag + rng.uniform(0, 0.02)
-        s1 = 0.975 - 0.05 * abs(t) - stag - rng.uniform(0, 0.02)
-        pts = []
-        for i in range(M + 1):
-            s = s0 + (s1 - s0) * i / M
-            off = t * hw(s, side) + amp * math.sin(math.pi * s) * math.sin(2 * math.pi * freq * s + phase + 0.7 * k)
-            pts.append(point(s, off))
-        lines.append(pts)
+        own = wobble(rng, rng.uniform(5.0, 8.0), 0.0065 * (1 - 0.8 * t * t))
+        stag = (k % 2) * rng.uniform(0.04, 0.09)
+        s0 = 0.04 + 0.05 * abs(t) + 0.5 * stag + rng.uniform(0, 0.03)
+        s1 = 0.955 - 0.06 * abs(t) - stag - rng.uniform(0, 0.03)
+        # Now and then a short break along the groove, as a burin skips.
+        cuts = sorted(rng.uniform(s0 + 0.2, s1 - 0.2) for _ in range(rng.choice((0, 0, 1))))
+        spans, a = [], s0
+        for c in cuts:
+            g = rng.uniform(0.02, 0.045)
+            if c - g / 2 - a > 0.08:
+                spans.append((a, c - g / 2))
+                a = c + g / 2
+        spans.append((a, s1))
+        for a, b in spans:
+            m = max(6, round(M * (b - a)))
+            pts = []
+            for i in range(m + 1):
+                s = a + (b - a) * i / m
+                off = t * hw(s, side) + shared(s) * (1 - t * t) + own(s)
+                pts.append(point(s, off))
+            lines.append((pts, t))
     return outline, lines
 
 
@@ -132,14 +155,16 @@ def inside(poly, x, y):
     return hit
 
 
-def covered(pile, x, y):
+def covered(pile, x, y, core=0.72):
+    """Whether (x, y) lies well inside an almond, where its ridges are dense
+    (not out at the tip or the rim, where the lines thin out)."""
     for cx, cy, rot, outline, _ in pile:
         dx, dy = x - cx, y - cy
         if dx * dx + dy * dy > 1.6:
             continue
         a = math.radians(-rot)
         lx, ly = dx * math.cos(a) - dy * math.sin(a), dx * math.sin(a) + dy * math.cos(a)
-        if inside(outline, lx, ly):
+        if inside(outline, lx / core, ly / core):
             return True
     return False
 
@@ -154,13 +179,13 @@ def build_pile(seed=5):
     rng = random.Random(seed)
 
     def nut(cx, cy):
-        L = rng.uniform(1.65, 2.15)
-        W = L * rng.uniform(0.55, 0.63)
+        L = rng.uniform(1.95, 2.45)
+        W = L * rng.uniform(0.54, 0.60)
         outline, lines = almond(rng, L, W)
         return (cx, cy, rng.uniform(0, 360), outline, lines)
 
     pile = []
-    for cx, cy in poisson(rng, dims.ART_R + 0.3, 0.98):
+    for cx, cy in poisson(rng, dims.ART_R + 0.3, 1.07):
         # Keep a quiet black field around the veg mark, as on the tin.
         if math.dist((cx, cy), VEG) < 1.25:
             continue
@@ -172,7 +197,7 @@ def build_pile(seed=5):
     rng.shuffle(pile)
     # The title is black knocked out of the ink, so it only reads where there
     # are almonds behind it: fill any gap under the lettering.
-    samples = [title_frame(x * 0.2, y * 0.2) for x in range(-14, 15) for y in range(-5, 6)]
+    samples = [title_frame(x * 0.2, y * 0.2) for x in range(-15, 16) for y in range(-6, 7)]
     rng.shuffle(samples)
     for x, y in samples:
         if not covered(pile, x, y):
@@ -190,13 +215,16 @@ def pile_svg(pile, ink, bg):
             return [(C + (cx + x * ca - y * sa) * U, C + (cy + x * sa + y * ca) * U) for x, y in pts]
 
         o = fmt(world(outline)) + 'Z'
+        # Engraver's shading: grooves on the side turned from the light are
+        # cut heavier, those facing it finer, so each nut reads as round.
+        facing = -sa * LIGHT[0] + ca * LIGHT[1]
         defs.append(f'<clipPath id="al{i}"><path d="{o}"/></clipPath>')
         body.append(
             f'<path d="{o}" fill="{bg}"/>'
-            f'<g clip-path="url(#al{i})" fill="none" stroke="{ink}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
-            + ''.join(f'<path d="{fmt(world(p))}"/>' for p in lines)
+            f'<g clip-path="url(#al{i})" fill="none" stroke="{ink}" stroke-linecap="round" stroke-linejoin="round">'
+            + ''.join(f'<path d="{fmt(world(p))}" stroke-width="{2.3 - 0.9 * facing * t:.2f}"/>' for p, t in lines)
             + '</g>'
-            f'<path d="{o}" fill="none" stroke="{ink}" stroke-width="3.0" stroke-linejoin="round"/>'
+            f'<path d="{o}" fill="none" stroke="{ink}" stroke-width="4.4" stroke-linejoin="round"/>'
         )
     return defs, body
 
@@ -209,11 +237,11 @@ def title_svg(color, halo):
     x0 = -2.56 * U
     y1 = -0.2 * U  # baseline of Smoked
     y2 = y1 + 1.2 * U  # baseline of Almonds
-    style = f'font-family="{FONT}" font-weight="600" font-size="{F:.1f}" letter-spacing="{TRACK:.1f}" fill="{color}"'
+    style = f'font-family="{FONT}" font-weight="700" font-size="{F:.1f}" letter-spacing="{TRACK:.1f}" fill="{color}"'
     stroke = f'stroke="{color}" stroke-width="{2 * halo:.1f}" stroke-linejoin="round" paint-order="stroke"'
     # IndiGo's capital A is an arch with a crossbar, narrower than Comfortaa's.
-    ax = x0 - 0.16 * U
-    aw = 0.56 * F
+    ax = x0 - 0.02 * U
+    aw = 0.54 * F
     sw = STEM
     r = (aw - sw) / 2
     xl, xr = ax + sw / 2, ax + aw - sw / 2

@@ -23,7 +23,7 @@ LAYER = 0.036  # spacing between stacked layers (2-ply embossed tissue, lofted)
 PLY = 0.014  # modelled paper thickness (Solidify)
 SKEW = 0.008  # fold 1 is a touch out of square, as on a real napkin
 
-DECKLE = 0.2  # depth of the torn perforation along the base's front edge
+DECKLE = 0.26  # depth of the torn perforation along the base's front edge (wave + jaggies + bites)
 
 # The printed line, measured on the photo relative to the flap.
 TEXT_LEFT = 1.45  # from the flap's left edge

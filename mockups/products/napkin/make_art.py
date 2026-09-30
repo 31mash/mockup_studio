@@ -23,7 +23,7 @@ import dims  # noqa: E402
 
 U = 100  # units per cm
 SW, SH = dims.SHEET_W * U, dims.SHEET_H * U
-PAPER = '#f6f5f1'
+PAPER = '#f6f6f3'
 INK = INDIGO_BLUE
 os.makedirs(os.path.join(HERE, 'art'), exist_ok=True)
 
@@ -40,10 +40,24 @@ line = (
     f'<tspan font-weight="400" font-size="{size * 0.9:.1f}">का नाम।</tspan>'
     '</text>'
 )
+# Tissue is never a flat white: its formation (the flocs of fibre) shows as a
+# faint cloudiness, 1 to 5 mm across, about 2 % in value. The ink soaks in a
+# little unevenly, so its density varies by a few per cent too.
 sheet = (
-    '<defs><filter id="ink" x="-5%" y="-50%" width="110%" height="200%">'
-    '<feGaussianBlur stdDeviation="0.45"/></filter></defs>'
+    '<defs>'
+    '<filter id="formation" x="0" y="0" width="100%" height="100%">'
+    '<feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" seed="4"/>'
+    '<feColorMatrix type="matrix" values="0 0 0 0 0.34  0 0 0 0 0.34  0 0 0 0 0.33  0.09 0 0 0 -0.034"/>'
+    '</filter>'
+    '<filter id="ink" x="-5%" y="-50%" width="110%" height="200%">'
+    '<feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="soft"/>'
+    '<feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="9" result="n"/>'
+    '<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.3 0.79" result="dens"/>'
+    '<feComposite in="soft" in2="dens" operator="in"/>'
+    '</filter>'
+    '</defs>'
     f'<rect width="{SW:.0f}" height="{SH:.0f}" fill="{PAPER}"/>'
+    f'<rect width="{SW:.0f}" height="{SH:.0f}" fill="#000" filter="url(#formation)"/>'
     f'<g transform="translate({x0:.1f} {y0:.1f}) scale(1 -1)" filter="url(#ink)">{line}</g>'
 )
 open(os.path.join(HERE, 'art', 'sheet.svg'), 'w').write(svg(SW, SH, sheet, px=6144))
@@ -87,7 +101,7 @@ while y < SH + P:
 dots = [f'<ellipse cx="0" cy="0" rx="7" ry="4.4" transform="translate({x:.1f} {y:.1f}) rotate({t:.1f})"/>' for x, y, t in placed]
 emboss = (
     '<defs><filter id="soft" x="0" y="0" width="100%" height="100%">'
-    '<feGaussianBlur stdDeviation="2.6"/></filter></defs>'
+    '<feGaussianBlur stdDeviation="3.6"/></filter></defs>'
     f'<rect width="{SW:.0f}" height="{SH:.0f}" fill="#000"/>'
     f'<g fill="#fff" filter="url(#soft)">{"".join(dots)}</g>'
 )
