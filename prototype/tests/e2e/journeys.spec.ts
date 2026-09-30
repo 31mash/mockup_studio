@@ -7,8 +7,8 @@ const jobCount = (page: Page) => page.locator('.jobs > section').count();
 
 async function openStudio(page: Page) {
   await page.goto('/');
-  // First open seeds a sample product and a two-image example batch.
-  await expect(page.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(2, { timeout: 20_000 });
+  // First open seeds a sample product, a turned example and a two-image batch.
+  await expect(page.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(3, { timeout: 20_000 });
 }
 
 async function openSettings(page: Page) {
@@ -16,10 +16,12 @@ async function openSettings(page: Page) {
   return page.getByRole('dialog', { name: 'Settings' });
 }
 
-test('first open shows a sample product and an example batch', async ({ page }) => {
+test('first open shows a sample product and example batches', async ({ page }) => {
   await openStudio(page);
   await expect(page.getByText('Sample dropper bottle')).toBeVisible();
   await expect(page.getByRole('heading', { name: /Minimalist Podiums, 3:4/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Studio white, 1:1/ })).toBeVisible();
+  await expect(page.getByText(/three-quarter right view/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Generate 1 image' })).toBeEnabled();
 });
 
@@ -170,8 +172,10 @@ test('camera: keyboard and numbers agree, Cancel restores, nothing generates (pl
   await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 6 });
   await page.mouse.up();
   await expect(sheet.getByLabel('Rotation in degrees')).not.toHaveValue('0');
+  await expect(sheet.getByRole('radio', { name: 'Left profile' })).toBeDisabled();
+  await expect(sheet.getByText(/Profile and top-down views need a generative engine/)).toBeVisible();
   await sheet.getByRole('radio', { name: 'Three-quarter left' }).click();
-  await expect(sheet.getByText(/invent the sides/)).toBeVisible();
+  await expect(sheet.getByText(/turns in real perspective/)).toBeVisible();
   await sheet.getByRole('button', { name: 'Apply angle' }).click();
   await expect(page.getByRole('button', { name: 'Angle: Three-quarter left. Change angle' })).toBeVisible();
   expect(await jobCount(page)).toBe(jobsBefore);
@@ -229,4 +233,26 @@ test('cancel stops pending cloud work', async ({ page }) => {
   await job.getByRole('button', { name: 'Cancel' }).click();
   await expect(job.getByText('Canceled', { exact: true }).first()).toBeVisible();
   await expect(job.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(0);
+});
+
+test('a turned product renders, and people keep their photographed angle', async ({ page }) => {
+  await openStudio(page);
+  await page.getByRole('button', { name: /^Angle:/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Camera angle' });
+  await sheet.getByLabel('Rotation in degrees').fill('90');
+  await sheet.getByLabel('Rotation in degrees').press('Enter');
+  await expect(sheet.getByLabel('Rotation in degrees')).toHaveValue('35'); // clamped to what the engine can do
+  await sheet.getByRole('button', { name: 'Apply angle' }).click();
+  await page.getByRole('button', { name: 'Generate 1 image' }).click();
+  const job = newestJob(page);
+  await expect(job.getByRole('button', { name: 'Download image', exact: true })).toHaveCount(1, { timeout: 20_000 });
+  await job.getByRole('button', { name: /^Details for/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Job details' }).getByText(/turned in perspective/)).toBeVisible();
+  await page.getByRole('dialog', { name: 'Job details' }).getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('tab', { name: 'Model', exact: true }).click();
+  await page.getByRole('button', { name: /^Angle:/ }).click();
+  await expect(sheet.getByLabel('Rotation', { exact: true })).toBeDisabled();
+  await expect(sheet.getByRole('radio', { name: 'Three-quarter left' })).toBeDisabled();
+  await expect(sheet.getByText('Turning a person needs a generative engine. Zoom still works here.')).toBeVisible();
 });

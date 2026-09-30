@@ -91,11 +91,22 @@ async function seed(): Promise<void> {
     prompt: 'Soft morning light and a gentle shadow.',
     count: 2,
   };
-  const job = buildJob(exampleDraft, engineFor('local'), sample.meta);
-  job.example = true;
-  setState((s) => ({ jobs: [job, ...s.jobs] }));
+  const pair = buildJob(exampleDraft, engineFor('local'), sample.meta);
+  // A second example shows the camera turning the product for real.
+  const turnedDraft: Draft & { source: Source } = {
+    ...createDraft('product'),
+    source,
+    ratio: '1:1',
+    backgroundId: 'studio-white',
+    camera: { kind: 'preset', name: 'three-quarter-right' },
+    count: 1,
+  };
+  const turned = buildJob(turnedDraft, engineFor('local'), sample.meta);
+  const examples = engineFor('local').caps.supportedCameraIntents.includes('three-quarter-right') ? [turned, pair] : [pair];
+  examples.forEach((j) => (j.example = true));
+  setState((s) => ({ jobs: [...examples, ...s.jobs] }));
   // Render in the background so the studio is usable straight away.
-  void runJob(job.snapshot.id, job.slots.map((x) => x.index), { quiet: true });
+  for (const j of examples) void runJob(j.snapshot.id, j.slots.map((x) => x.index), { quiet: true });
 }
 
 // ---------------------------------------------------------------- sources

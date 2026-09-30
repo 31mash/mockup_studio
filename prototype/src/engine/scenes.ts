@@ -43,24 +43,35 @@ export const SCENE_HORIZON: Record<SceneKind, number> = {
   cafe: 0.76,
 };
 
-export function paintScene(x: Ctx, kind: SceneKind, p: SceneParams): void {
+/** The surface the subject stands on, so shadows stay on it. */
+export type Ground = { kind: 'plane'; y: number } | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number };
+
+export function paintScene(x: Ctx, kind: SceneKind, p: SceneParams): Ground {
+  const plane: Ground = { kind: 'plane', y: p.horizon };
   switch (kind) {
     case 'studio-white':
-      return sweep(x, p, '#F3F3EF', '#E2E1DB', 0.4);
+      sweep(x, p, '#F3F3EF', '#E2E1DB', 0.4);
+      return plane;
     case 'seamless-monochrome':
-      return sweep(x, p, shade(p.color, 0.1), shade(p.color, -0.12), 0.25);
+      sweep(x, p, shade(p.color, 0.1), shade(p.color, -0.12), 0.25);
+      return plane;
     case 'minimalist-podium':
       return podium(x, p);
     case 'natural-outdoor':
-      return outdoorClose(x, p);
+      outdoorClose(x, p);
+      return plane;
     case 'aesthetic-indoor':
-      return indoor(x, p);
+      indoor(x, p);
+      return plane;
     case 'natural-outdoor-environment':
-      return outdoorWide(x, p);
+      outdoorWide(x, p);
+      return plane;
     case 'corporate-office':
-      return office(x, p);
+      office(x, p);
+      return plane;
     case 'cafe':
-      return cafe(x, p);
+      cafe(x, p);
+      return plane;
   }
 }
 
@@ -97,7 +108,7 @@ function sweep(x: Ctx, p: SceneParams, wall: string, floor: string, pool: number
   vignette(x, p, 0.12);
 }
 
-function podium(x: Ctx, p: SceneParams): void {
+function podium(x: Ctx, p: SceneParams): Ground {
   const { W, H, subject, rand } = p;
   sweep(x, p, '#DADBD3', '#C9C8BF', 0.3);
 
@@ -112,10 +123,11 @@ function podium(x: Ctx, p: SceneParams): void {
 
   const pw = Math.min(W * 0.84, Math.max(W * 0.3, subject.w * 1.55));
   const cx = subject.x + subject.w / 2 + (rand() - 0.5) * W * 0.01;
-  cylinder(x, cx, subject.y, pw, H * 1.2, '#EEECE7', p);
+  const ry = cylinder(x, cx, subject.y, pw, H * 1.2, '#EEECE7', p);
+  return { kind: 'ellipse', cx, cy: subject.y, rx: pw / 2, ry };
 }
 
-function cylinder(x: Ctx, cx: number, topY: number, w: number, height: number, color: string, p: SceneParams): void {
+function cylinder(x: Ctx, cx: number, topY: number, w: number, height: number, color: string, p: SceneParams): number {
   const ry = w * (0.07 + 0.3 * Math.max(0, p.tilt) / 90);
   const left = cx - w / 2;
   const side = x.createLinearGradient(left, 0, left + w, 0);
@@ -138,6 +150,7 @@ function cylinder(x: Ctx, cx: number, topY: number, w: number, height: number, c
   x.strokeStyle = rgba(shade(color, -0.2), 0.25);
   x.lineWidth = Math.max(1, w * 0.003);
   x.stroke();
+  return ry;
 }
 
 function foliage(b: Ctx, p: SceneParams, count: number, y0: number, y1: number, sizes: [number, number], palette: string[]): void {

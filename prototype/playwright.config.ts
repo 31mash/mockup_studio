@@ -8,6 +8,14 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4173', trace: 'retain-on-failure' },
   webServer: { command: 'npx vite preview --port 4173 --strictPort', port: 4173, reuseExistingServer: true },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    {
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        // Software WebGL, so the camera re-projection runs in headless Chromium.
+        launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
+      },
+    },
   ],
 });

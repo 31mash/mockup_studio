@@ -1017,6 +1017,12 @@ dialog.sheet.is-popover::backdrop {
   stroke: var(--ink);
   stroke-width: 1.25;
 }
+.orbit-reach {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
 .orbit-path {
   fill: none;
   stroke: var(--ink);
@@ -1093,6 +1099,11 @@ dialog.sheet.is-popover::backdrop {
 }
 .preset:hover {
   border-color: var(--muted);
+}
+.preset:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+  border-style: dashed;
 }
 .preset[aria-checked='true'] {
   border-color: var(--ink);

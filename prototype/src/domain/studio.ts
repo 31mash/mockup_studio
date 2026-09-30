@@ -96,10 +96,11 @@ export type Issue = { field: string; code: string; message: string };
 export type Dimensions = { width: number; height: number };
 
 /**
- * `scene-only` is a prototype addition to the plan's enum: the sketch engine
- * moves the scene and framing for a camera change but cannot redraw the subject.
+ * `reprojection` is a prototype addition to the plan's enum: the engine turns
+ * the photographed product in real perspective within limits, and cannot
+ * invent views the photo does not contain.
  */
-export type CameraSupport = 'validated-view-control' | 'qualified-prompt' | 'scene-only';
+export type CameraSupport = 'validated-view-control' | 'qualified-prompt' | 'reprojection';
 
 export type Capabilities = {
   referenceEdit: boolean;
@@ -111,6 +112,10 @@ export type Capabilities = {
   supportedRatios: Ratio[];
   /** Output dimensions must be a multiple of this (1 = any size). */
   dimensionStep: number;
+  /** How far the engine can turn the camera, in degrees, when limited. */
+  cameraLimits?: { rotation: number; tiltMin: number; tiltMax: number };
+  /** Whether rotation and tilt apply to people as well as products. */
+  turnsPeople?: boolean;
 };
 
 export type AssetRole = 'product' | 'person' | 'result';

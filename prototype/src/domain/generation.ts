@@ -1,5 +1,5 @@
 import { BACKGROUNDS, NATIVE_CANVAS, PROMPT_LIMIT } from './catalogs';
-import { ORIGINAL, normalizeCamera } from './camera';
+import { cameraPosition, ORIGINAL, normalizeCamera } from './camera';
 import type {
   AssetMeta,
   Capabilities,
@@ -69,8 +69,27 @@ export function validateDraft(draft: Draft, caps: Capabilities, ctx: ValidationC
     issues.push({ field: 'camera', code: 'camera-out-of-range', message: 'Camera values are outside the allowed range.' });
   }
   const camKey = cam.kind === 'preset' ? cam.name : 'relative';
+  const pos = cameraPosition(cam);
+  const turns = pos.rotation !== 0 || pos.tilt !== 0;
   if (!caps.supportedCameraIntents.includes(camKey)) {
-    issues.push({ field: 'camera', code: 'camera-unsupported', message: "This engine can't change the camera angle." });
+    issues.push({
+      field: 'camera',
+      code: 'camera-unsupported',
+      message: caps.cameraLimits
+        ? 'Profile and top-down views need a generative engine. Choose a three-quarter view or a custom turn.'
+        : "This engine can't change the camera angle.",
+    });
+  } else if (turns && draft.tab === 'model' && caps.turnsPeople === false) {
+    issues.push({ field: 'camera', code: 'camera-people', message: 'Turning a person needs a generative engine. Keep the original angle, or adjust zoom only.' });
+  } else if (caps.cameraLimits && cam.kind === 'relative') {
+    const l = caps.cameraLimits;
+    if (Math.abs(cam.rotation) > l.rotation || cam.tilt < l.tiltMin || cam.tilt > l.tiltMax) {
+      issues.push({
+        field: 'camera',
+        code: 'camera-beyond-limits',
+        message: `This engine turns up to ${l.rotation}° and tilts from ${l.tiltMin}° to ${l.tiltMax}°.`,
+      });
+    }
   }
 
   return issues;

@@ -18,10 +18,12 @@ const caps: Capabilities = {
   offline: true,
   cancel: true,
   maxParallel: 1,
-  camera: 'scene-only',
-  supportedCameraIntents: ['original', 'front', 'three-quarter-left', 'three-quarter-right', 'left-profile', 'right-profile', 'top-down', 'relative'],
+  camera: 'reprojection',
+  supportedCameraIntents: ['original', 'front', 'three-quarter-left', 'three-quarter-right', 'relative'],
   supportedRatios: RATIOS.map((r) => r.id),
   dimensionStep: 1,
+  cameraLimits: { rotation: 35, tiltMin: -15, tiltMax: 40 },
+  turnsPeople: false,
 };
 
 const withSource = (d: Draft): Draft => ({ ...d, source: { kind: 'upload', assetId: 'a1' } });
@@ -102,9 +104,27 @@ describe('validation', () => {
   });
 
   test('engine capability gates camera intents', () => {
-    const noCamera = { ...caps, supportedCameraIntents: ['original'] };
-    const d = { ...withSource(createDraft('product')), camera: { kind: 'preset' as const, name: 'top-down' as const } };
+    const noCamera = { ...caps, supportedCameraIntents: ['original'], cameraLimits: undefined };
+    const d = { ...withSource(createDraft('product')), camera: { kind: 'preset' as const, name: 'three-quarter-left' as const } };
     expect(validateDraft(d, noCamera).map((i) => i.code)).toEqual(['camera-unsupported']);
+  });
+
+  test('profiles and top-down need a generative engine; turns stay within limits', () => {
+    const base = withSource(createDraft('product'));
+    const profile = validateDraft({ ...base, camera: { kind: 'preset', name: 'left-profile' } }, caps);
+    expect(profile.map((i) => i.code)).toEqual(['camera-unsupported']);
+    expect(profile[0].message).toContain('generative engine');
+    expect(validateDraft({ ...base, camera: { kind: 'preset', name: 'three-quarter-right' } }, caps)).toEqual([]);
+    expect(validateDraft({ ...base, camera: { kind: 'relative', rotation: 35, tilt: 40, zoom: 20 } }, caps)).toEqual([]);
+    expect(validateDraft({ ...base, camera: { kind: 'relative', rotation: 50, tilt: 0, zoom: 0 } }, caps).map((i) => i.code)).toEqual([
+      'camera-beyond-limits',
+    ]);
+  });
+
+  test('people keep their photographed angle; zoom still works', () => {
+    const person = { ...createDraft('model'), source: { kind: 'catalog' as const, modelId: 'maya', assetId: 'catalog:maya' } };
+    expect(validateDraft({ ...person, camera: { kind: 'relative', rotation: 20, tilt: 0, zoom: 0 } }, caps).map((i) => i.code)).toEqual(['camera-people']);
+    expect(validateDraft({ ...person, camera: { kind: 'relative', rotation: 0, tilt: 0, zoom: 25 } }, caps)).toEqual([]);
   });
 });
 

@@ -89,8 +89,8 @@ export type PresetOption = { id: CameraPreset; label: string; rotation: number; 
 export const CAMERA_PRESETS: readonly PresetOption[] = [
   { id: 'original', label: 'Original', rotation: 0, tilt: 0 },
   { id: 'front', label: 'Front', rotation: 0, tilt: 0 },
-  { id: 'three-quarter-left', label: 'Three-quarter left', rotation: -45, tilt: 0 },
-  { id: 'three-quarter-right', label: 'Three-quarter right', rotation: 45, tilt: 0 },
+  { id: 'three-quarter-left', label: 'Three-quarter left', rotation: -35, tilt: 0 },
+  { id: 'three-quarter-right', label: 'Three-quarter right', rotation: 35, tilt: 0 },
   { id: 'left-profile', label: 'Left profile', rotation: -90, tilt: 0 },
   { id: 'right-profile', label: 'Right profile', rotation: 90, tilt: 0 },
   { id: 'top-down', label: 'Top-down', rotation: 0, tilt: 90 },

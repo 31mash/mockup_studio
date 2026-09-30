@@ -103,7 +103,7 @@ export function JobDetails({ jobId, onClose }: { jobId: string | null; onClose: 
     ['Background', `${findBackground(d.tab, d.backgroundId).label}${d.backgroundId === 'seamless-monochrome' && d.monochromeColor ? `, ${d.monochromeColor}` : ''}`],
     ['Ratio', ratioLabel(d.ratio)],
     ['Output size', `${snapshot.target.width} × ${snapshot.target.height} px, ${snapshot.target.framing} framing`],
-    ['Angle', describeCamera(d.camera)],
+    ['Angle', `${describeCamera(d.camera)}${d.camera.kind === 'preset' && d.camera.name === 'original' ? '' : ', turned in perspective from your photo'}`],
     ['Results', String(d.count)],
     ['Created', formatTime(snapshot.createdAt)],
   ];
