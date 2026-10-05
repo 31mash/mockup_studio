@@ -1,0 +1,139 @@
+<title>IndiGo Food Packaging</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Studio sweep: the page is the renders' own grey (#d1d2d6), so every shot sits on it
+   seamlessly, like one long contact sheet; a sticky index runs along the top. */
+:root {
+  --sweep: #d1d2d6;
+  --ink: #23254a;
+  --muted: #565a70;
+  --indigo: #3d4399;
+  --plane: #9fcc3b;
+  --rule: rgba(35, 37, 74, 0.16);
+  --paper: #f4f4f1;
+  --scrim: rgba(28, 29, 48, 0.88);
+  --display: 'Comfortaa', 'Varela Round', 'Nunito', system-ui, sans-serif;
+  --body: 'Figtree', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  color-scheme: light;
+}
+html { background: var(--sweep); }
+body { background: var(--sweep); color: var(--ink); font: 400 1rem/1.55 var(--body); margin: 0; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 48px); padding-block: 0 4rem; }
+
+header.top { padding-block: clamp(2rem, 6vw, 4.5rem) 1.5rem; display: grid; gap: 1.25rem; }
+.mark { width: 56px; height: auto; }
+h1 { font: 700 clamp(2rem, 5.2vw, 3.6rem)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.lede { max-width: 62ch; color: var(--muted); margin: 0; font-size: 1.06rem; }
+.facts { font: 500 0.8rem/1.4 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+nav.index { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--sweep) 92%, transparent); backdrop-filter: blur(6px); border-block: 1px solid var(--rule); }
+nav.index ul { list-style: none; margin: 0 auto; max-width: 1320px; padding: 0.55rem clamp(16px, 4vw, 48px); display: flex; gap: 0.25rem 1.1rem; flex-wrap: wrap; }
+nav.index a { color: var(--ink); text-decoration: none; font: 500 0.9rem/1.6 var(--body); white-space: nowrap; }
+nav.index a:hover, nav.index a:focus-visible { color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
+
+section.product { padding-block: clamp(2.5rem, 6vw, 4.5rem) 0; border-bottom: 1px solid var(--rule); scroll-margin-top: 3.2rem; }
+.head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem 2.5rem; align-items: end; }
+.head h2 { font: 700 clamp(1.6rem, 3.4vw, 2.5rem)/1.1 var(--display); letter-spacing: -0.015em; margin: 0 0 0.4rem; text-wrap: balance; }
+.head p { margin: 0; max-width: 60ch; color: var(--muted); }
+.origin { display: grid; gap: 0.35rem; justify-items: end; }
+.origin span { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.origin div { display: flex; gap: 0.4rem; }
+.origin img { height: 84px; width: auto; background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 0.25rem 1rem; margin-top: 1rem; }
+.shots figure:first-child { grid-column: 1 / -1; }
+figure { margin: 0; }
+figure button { all: unset; display: block; cursor: zoom-in; width: 100%; border-radius: 2px; }
+figure button:focus-visible { outline: 2px solid var(--indigo); outline-offset: 3px; }
+figure img { display: block; width: 100%; height: auto; aspect-ratio: 2000 / 1280; max-width: 100%; }
+figcaption { font: 400 0.78rem/1.3 var(--mono); color: var(--muted); padding: 0.1rem 0 0.9rem; display: flex; justify-content: space-between; gap: 1rem; }
+.shots figure:first-child figcaption { justify-content: flex-start; }
+
+footer { padding-block: 2.5rem 0; color: var(--muted); font-size: 0.9rem; max-width: 70ch; display: grid; gap: 0.6rem; }
+footer p { margin: 0; }
+code { font: 400 0.86em var(--mono); color: var(--ink); }
+
+dialog { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100%; }
+dialog::backdrop { background: var(--scrim); }
+.lb { height: 100%; display: grid; grid-template-rows: 1fr auto; gap: 0.6rem; padding: clamp(8px, 3vw, 32px); box-sizing: border-box; }
+.lb img { width: 100%; height: 100%; object-fit: contain; min-height: 0; background: transparent; }
+.lb .bar { display: flex; align-items: center; gap: 0.75rem; color: var(--paper); font: 500 0.88rem/1.3 var(--body); flex-wrap: wrap; }
+.lb .bar .name { flex: 1 1 auto; min-width: 0; }
+.lb .bar .name b { font-family: var(--display); font-weight: 700; margin-right: 0.5rem; }
+.lb button { font: 500 0.85rem/1 var(--body); color: var(--paper); background: transparent; border: 1px solid rgba(244, 244, 241, 0.4); border-radius: 999px; padding: 0.55rem 0.95rem; cursor: pointer; }
+.lb button:hover, .lb button:focus-visible { border-color: var(--paper); outline: none; }
+
+@media (max-width: 640px) {
+  .head { grid-template-columns: minmax(0, 1fr); }
+  .origin { justify-items: start; }
+  .origin img { height: 64px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  figure img { transition: transform 0.35s ease; }
+  figure button:hover img { transform: scale(1.012); }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <svg class="mark" viewBox="-2.2 -1.8 8 8" role="img" aria-label="IndiGo dotted plane">
+      {{PLANE}}
+    </svg>
+    <h1>IndiGo Food Packaging</h1>
+    <p class="lede">3D product mockups of IndiGo's in-flight food range, rebuilt from the packaging spread and shot in one studio, with the same light, sweep and contact shadow as the Nut Case render. Select any shot to see it full size.</p>
+    <p class="facts">{{PRODUCTS}} products &middot; {{COUNT}} shots &middot; 2000 &times; 1280 px &middot; Blender Cycles</p>
+  </header>
+</div>
+<nav class="index" aria-label="Products"><ul>{{INDEX}}</ul></nav>
+<main class="wrap">
+{{SECTIONS}}
+  <footer>
+    <p>Every shot also exists as a transparent PNG with its shadow, for placing on any colour, in <code>mockups/renders/</code> of the repository, beside these JPGs.</p>
+    <p>Artwork is redrawn as vector from the spread, which is a low-resolution photo. Where the spread doesn't show a side, its print is new copy in the same style. To use the original print files instead, replace the PNGs in each product's <code>art/</code> folder and render again.</p>
+  </footer>
+</main>
+
+<dialog id="lightbox" aria-label="Shot, full size">
+  <div class="lb">
+    <img id="lb-img" alt="">
+    <div class="bar">
+      <span class="name" id="lb-name"></span>
+      <button type="button" id="lb-prev" aria-label="Previous shot">&larr; Prev</button>
+      <button type="button" id="lb-next" aria-label="Next shot">Next &rarr;</button>
+      <button type="button" id="lb-close">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const shots = [...document.querySelectorAll('figure button[data-full]')];
+  const dlg = document.getElementById('lightbox');
+  const img = document.getElementById('lb-img');
+  const name = document.getElementById('lb-name');
+  let at = 0;
+  function show(i) {
+    at = (i + shots.length) % shots.length;
+    const b = shots[at];
+    img.src = b.dataset.full;
+    img.alt = `${b.dataset.product}, ${b.dataset.label}`;
+    name.innerHTML = '';
+    const strong = document.createElement('b');
+    strong.textContent = b.dataset.product;
+    name.append(strong, document.createTextNode(b.dataset.label));
+  }
+  shots.forEach((b, i) => b.addEventListener('click', () => { show(i); dlg.showModal(); }));
+  document.getElementById('lb-prev').addEventListener('click', () => show(at - 1));
+  document.getElementById('lb-next').addEventListener('click', () => show(at + 1));
+  document.getElementById('lb-close').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.classList.contains('lb')) dlg.close(); });
+  dlg.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); show(at + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(at - 1); }
+  });
+  dlg.addEventListener('close', () => { shots[at]?.focus(); });
+})();
+</script>

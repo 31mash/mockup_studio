@@ -40,7 +40,6 @@ SHOTS = [
     {'name': 'set-hero', 'preset': 'hero', 'variant': 'set:-20,0,95@31', 'fill': 0.66},
     # As in the spread: each can shows the same stretch of label as the photo.
     {'name': 'set-front', 'preset': 'front', 'variant': 'set', 'fill': 0.74},
-    {'name': 'set-top', 'preset': 'top', 'variant': 'set', 'fill': 0.74},
 ]
 VARIANTS = ['brown', 'pink', 'navy', 'set']
 

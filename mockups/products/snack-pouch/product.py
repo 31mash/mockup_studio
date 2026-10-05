@@ -12,7 +12,7 @@ import food  # noqa: E402
 import pouch  # noqa: E402
 
 TITLE = 'Namkeen pouch'
-SHOTS = ['hero', 'hero-right', 'front', 'side', 'low']
+SHOTS = ['hero', 'hero-right', 'front', 'low']  # side-on dropped: only a narrow sliver of the pouch
 
 
 def build(ctx, variant=None):
