@@ -35,3 +35,4 @@ See [`prototype/README.md`](prototype/README.md) for what is real, what is simul
 | [Implementation plan](docs/superpowers/plans/2026-09-29-future-mockup-studio.md) | 11 tasks across milestones M0–M3, contracts, API, tests |
 | [Research and decisions](docs/research/sources-and-decisions.md) | Engine candidates, sources, decision rationale |
 | [Prototype](prototype/README.md) | How to run it, what it covers, requirement status |
+| [Packaging mockups](mockups/README.md) | 3D studio renders of IndiGo's in-flight food packaging: 14 products, 92 shots, and the Blender studio that makes them |

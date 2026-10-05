@@ -75,6 +75,19 @@ def shot_order(pid: str) -> list[str]:
     return render_all.shot_names(pid)
 
 
+def comfortaa_faces() -> str:
+    """Comfortaa (the display face, nearest to IndiGo's lettering) inlined, so
+    the page keeps its look even where Google Fonts can't load."""
+    import base64
+
+    out = []
+    for w in (500, 700):
+        f = os.path.join(HERE, 'node_modules', '@fontsource', 'comfortaa', 'files', f'comfortaa-latin-{w}-normal.woff2')
+        data = base64.b64encode(open(f, 'rb').read()).decode()
+        out.append(f"@font-face {{ font-family: 'Comfortaa'; font-weight: {w}; font-style: normal; font-display: swap; src: url(data:font/woff2;base64,{data}) format('woff2'); }}")
+    return '\n'.join(out)
+
+
 def thumb(src: str, dst: str, width: int) -> tuple[int, int]:
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     im = Image.open(src).convert('RGB')
@@ -128,6 +141,7 @@ def main():
         .replace('{{COUNT}}', str(total))
         .replace('{{PRODUCTS}}', str(len(products)))
         .replace('{{PLANE}}', plane_dots_svg())
+        .replace('{{FONTFACE}}', comfortaa_faces())
         .replace('{{INDEX}}', ''.join(f'<li><a href="#{p["id"]}">{e(p["name"])}</a></li>' for p in products))
     )
     os.makedirs(SITE, exist_ok=True)

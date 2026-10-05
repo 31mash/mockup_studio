@@ -7,6 +7,29 @@ Every product is a real 3D model rendered with Blender's Cycles path tracer, so 
 - `renders/<product>/<shot>.jpg`: on the studio grey, 2000 × 1280 px (the reference's size);
 - `renders/<product>/<shot>.png`: the same shot with a transparent background and its shadow, to place on any colour.
 
+## The set
+
+14 products, 92 shots, each art-directed against its crop from the spread:
+
+| Product | Folder | Shots |
+|---|---|---|
+| Nut Case tin | `nut-case` | 7 |
+| Cookie tins (Chocolate chip, Oatmeal + Honey, set of three, open) | `cookie-tins` | 7 |
+| Smoked Almonds tin | `smoked-almonds-tin` | 8 |
+| Gadget tin | `gadget-tin` | 6 |
+| Stick Man canisters (brown, pink, navy, set) | `stick-man-canisters` | 6 |
+| Tiffin sandwich wedges (Love Story, Big Don) | `tiffin-wedge` | 7 |
+| DaBlue Burger box | `deblue-burger-box` | 8 |
+| Spicy Kulcha matchbox (single, pair) | `spicy-kulcha-box` | 8 |
+| Mini Dosai (chicken, veg, pair) | `mini-dosai-box` | 6 |
+| Chandni Chowk samosa bag (with samosa) | `chandni-chowk-bag` | 6 |
+| Bunji! paper bag | `bunji-bag` | 5 |
+| Namkeen pouch | `snack-pouch` | 4 |
+| Napkin (single, stack) | `napkin` | 7 |
+| Posters (Thought for food, Say no to airline food) | `posters` | 7 |
+
+`renders/contact-sheet.jpg` shows them all at a glance. Where the spread doesn't show a side of a pack, its print is new copy in the same style; each product's `make_art.py` notes which.
+
 ## How it's built
 
 ```text
@@ -15,7 +38,10 @@ studio/            the shared studio: core.py (scene, lights, camera presets, re
                    composite), shapes.py (tins, walls, beads, cartons), layout.py (outlines
                    and artwork positions, no Blender needed), materials.py
 brand/indigo.py    IndiGo pieces for artwork: the dotted plane, colours, font, veg marks
-tools/raster.mjs   artwork SVG/HTML to PNG, with 35 bundled font families
+tools/raster.mjs   artwork SVG/HTML to PNG, with 36 bundled font families
+tools/render_all.py   every product's finals in one run (--missing: only shots not yet rendered)
+tools/contact_sheet.py  renders/contact-sheet.jpg
+tools/gallery.py   the gallery page in site/ (shots, the spread's originals, full-size viewer)
 products/<id>/     one folder per product: dims.py, make_art.py, art/, product.py, preview/
 render.py          renders a product's shots
 renders/           final shots
@@ -36,9 +62,10 @@ python3 products/nut-case/make_art.py && node tools/raster.mjs products/nut-case
 python3 render.py nut-case --preview          # 800 x 512 previews in products/nut-case/preview/
 python3 render.py nut-case                    # finals in renders/nut-case/
 python3 render.py nut-case --shots hero,top   # some shots only
+python3 tools/render_all.py --missing    # every product's missing finals
 ```
 
-A preview takes about 13 s on 4 CPU cores; a final about a minute.
+On 4 CPU cores a preview takes about 15 s and a final about 2 to 3 minutes; all 92 finals take about 3½ hours. Finals use 40 samples with OpenImageDenoise, which on these clean studio scenes is indistinguishable from 160 samples.
 
 ## The studio
 
@@ -87,7 +114,7 @@ def build(ctx, variant=None):
 
 - Write artwork as SVG (or HTML for long flowing text) in `art/`, one file per surface, then `node tools/raster.mjs products/<id>/art`. Each file becomes a PNG beside it; files starting with `_` are skipped.
 - Size the artwork on the real surface: `brand/indigo.svg()` uses 100 units per cm. `data-width` sets the PNG width (default 4096; use up to 12288 for long wrap strips).
-- Fonts by family name: Comfortaa (IndiGo's rounded lettering), Quicksand, Varela Round, Nunito, Noto Sans/Serif Devanagari, Tiro Devanagari Hindi, Mukta, Noto Sans/Serif Tamil, Alfa Slab One, Roboto Slab, Zilla Slab, Bevan, Rye, Abril Fatface, Playfair Display, Oswald, Bebas Neue, Archivo Black, Archivo, Anton, Pacifico, Lobster, Kalam, Special Elite, Inter, Libre Baskerville, Old Standard TT, Courier Prime, Fredoka, Baloo 2, Yatra One, Permanent Marker, Caveat Brush.
+- Fonts by family name: Comfortaa (IndiGo's rounded lettering), Noto Sans Gujarati, Quicksand, Varela Round, Nunito, Noto Sans/Serif Devanagari, Tiro Devanagari Hindi, Mukta, Noto Sans/Serif Tamil, Alfa Slab One, Roboto Slab, Zilla Slab, Bevan, Rye, Abril Fatface, Playfair Display, Oswald, Bebas Neue, Archivo Black, Archivo, Anton, Pacifico, Lobster, Kalam, Special Elite, Inter, Libre Baskerville, Old Standard TT, Courier Prime, Fredoka, Baloo 2, Yatra One, Permanent Marker, Caveat Brush.
 - Brand pieces: `brand.indigo.plane_svg()` (the dotted plane, measured from the posters), `veg_mark()`, `nonveg_mark()`, `INDIGO_BLUE`, `INDIGO_GREEN`, `FONT`.
 
 UV conventions (`studio/shapes.py`):
