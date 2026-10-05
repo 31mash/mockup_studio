@@ -53,14 +53,19 @@ def configure_render(preview: bool = False, size: tuple[int, int] | None = None,
     sc = bpy.context.scene
     sc.render.engine = 'CYCLES'
     sc.cycles.device = 'CPU'
-    sc.cycles.samples = samples or (24 if preview else 160)
+    # 40 samples with the OpenImageDenoise pass is indistinguishable from 160
+    # on these clean studio scenes (under one level of mean difference on the
+    # Nut Case hero) at a third of the time.
+    sc.cycles.samples = samples or (24 if preview else 40)
     sc.cycles.use_adaptive_sampling = True
-    sc.cycles.adaptive_threshold = 0.02 if preview else 0.006
+    sc.cycles.adaptive_threshold = 0.02 if preview else 0.015
     sc.cycles.use_denoising = True
     sc.cycles.denoiser = 'OPENIMAGEDENOISE'
-    sc.cycles.max_bounces = 8
+    sc.cycles.max_bounces = 6
+    sc.cycles.diffuse_bounces = 2
+    sc.cycles.glossy_bounces = 3
     sc.cycles.transparent_max_bounces = 16
-    sc.cycles.transmission_bounces = 8
+    sc.cycles.transmission_bounces = 6
     sc.cycles.caustics_reflective = False
     sc.cycles.caustics_refractive = False
     sc.cycles.blur_glossy = 1.0
