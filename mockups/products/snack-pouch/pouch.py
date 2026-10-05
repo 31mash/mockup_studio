@@ -177,7 +177,22 @@ def _rows():
         zs.append(z)
         z += 0.13
     zs.append(dims.Z_TOP)
-    return np.array(zs)
+    # Rows on the tear notches' tip and ends, so the V cuts clean; rows that
+    # would crowd them go.
+    zn = dims.Z_TOP - dims.NOTCH
+    extra = [zn - NOTCH_HALF, zn, zn + NOTCH_HALF]
+    zs = [v for v in zs if min(abs(v - e) for e in extra) > 0.05] + extra
+    return np.array(sorted(zs))
+
+
+NOTCH_DEPTH = 0.32  # how far the tear notches cut into the side seals
+NOTCH_HALF = 0.17  # half their height at the edge
+
+
+def notch_depth(z):
+    """Depth of the tear notch cut into each side seal at height z."""
+    zn = dims.Z_TOP - dims.NOTCH
+    return NOTCH_DEPTH * np.clip(1.0 - np.abs(z - zn) / NOTCH_HALF, 0.0, 1.0)
 
 
 def _columns():
@@ -257,6 +272,21 @@ def panel_grid(side: int, seed: float = 0.0):
             out = max(out, 0.0) * lock
             Q[r, c, 1] += common + side * out * low
     P = Q
+
+    # Tear notches: a small V cut into both side seals below the header. The
+    # fin's columns close up towards the seal so none folds over another.
+    for r in range(rows):
+        d = float(notch_depth(zs[r]))
+        if d <= 0:
+            continue
+        for c in range(cols):
+            u = us[c]
+            edge = min(u, dims.W - u)
+            if edge < dims.SEAL:
+                # x of the seal line on this row, where the fin meets the lens.
+                k = int(np.argmin(np.abs(us - (dims.SEAL if u < dims.W / 2 else dims.W - dims.SEAL))))
+                xs_ = P[r, k, 0]
+                P[r, c, 0] = xs_ + (P[r, c, 0] - xs_) * (dims.SEAL - d) / dims.SEAL
 
     # UVs: u across the flat film, v by arc length down each column.
     U = np.broadcast_to(us / dims.W, (rows, cols))
