@@ -252,7 +252,7 @@ def flap(sh, mat):
     ns = len(s)
     rows = np.nonzero(t >= L - F - 1e-6)[0][::-1]  # from the fold down to the free edge
     R = dims.FOLD_R
-    gap0 = 0.03
+    gap0 = 0.025
     total = F + dims.FOLD_ARC
     lift = _waves(33, 5, 1.0, 4.0)
 
@@ -271,7 +271,7 @@ def flap(sh, mat):
     # The flat part, following the panel.
     for n, i in enumerate(rows):
         f = L - t[i]
-        spring = 0.12 * (f / F) ** 2.2
+        spring = 0.06 * (f / F) ** 2.2
         row = []
         for j in range(ns):
             w = max(0.3, 1.0 + 0.35 * float(lift(np.array(s[j]), np.array(0.0))))

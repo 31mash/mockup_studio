@@ -5,7 +5,8 @@ and slanted front form a tube with rounded folds, closed by the two triangle
 ends. It is built as the outer skin (with a die-cut window in the front),
 then given the board's thickness with Solidify, so the window shows a real
 cut edge. A clear film is glued behind the window; behind it, the cut faces
-of two sandwich halves (white and brown bread) with corn and chutney.
+of two sandwich halves (white and brown bread) with corn and chutney, from the
+original pack's photo (see food.py).
 """
 
 import importlib.util
@@ -15,6 +16,7 @@ import sys
 
 import bmesh
 import bpy
+from studio.layout import inset
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -30,42 +32,29 @@ def _sibling(name):
 dims = _sibling('dims')
 food = _sibling('food')
 
-
-# render.py rebuilds the scene with core.reset() when the variant changes, but
-# studio.core keeps a Python reference to the old light-target empty, and the
-# next core.studio() fails on it (ReferenceError). Until core.reset() clears
-# it, forget it here whenever the factory scene is reloaded.
-@bpy.app.handlers.persistent
-def _forget_light_target(*_):
-    from studio import core
-
-    core._ORIGIN = None
-
-
-if not any(getattr(h, '__name__', '') == '_forget_light_target' for h in bpy.app.handlers.load_factory_startup_post):
-    bpy.app.handlers.load_factory_startup_post.append(_forget_light_target)
-
-from studio.layout import inset  # noqa: E402
-
 TITLE = 'Tiffin sandwich wedge'
 VARIANTS = [None, 'big-don', 'set']
 SHOTS = [
     'hero',
     'hero-right',
-    {'name': 'front', 'preset': 'front', 'elevation': 14, 'fill': 0.58},
+    # High enough to look into the window, low enough to read as a wedge.
+    {'name': 'front', 'preset': 'front', 'elevation': 22, 'fill': 0.58},
     {'name': 'back', 'preset': 'back', 'azimuth': 148, 'elevation': 24},
     {'name': 'side', 'preset': 'side', 'elevation': 18},
     {'name': 'big-don-hero', 'preset': 'hero', 'variant': 'big-don'},
-    {'name': 'big-don-back', 'preset': 'back', 'azimuth': 148, 'elevation': 24, 'variant': 'big-don'},
     {'name': 'set-hero', 'preset': 'hero', 'variant': 'set', 'fill': 0.6},
 ]
 
 W, L, T = dims.W, dims.L, dims.T
 
-# (variant, location, turn in degrees) of each pack in the set shot.
+# (variant, location, turn in degrees) of each pack in the set shot: Love Story
+# in front, its window turned a little towards the camera; Big Don beside it
+# and a step behind, turned so its story panel faces the camera and its
+# Aero-bics end shows on the right. They stand 1.8 cm apart and do not
+# overlap in the hero view.
 SET_LAYOUT = (
-    ('love-story', (-4.6, -2.2, 0.0), -6.0),
-    ('big-don', (9.3, 5.0, 0.0), 116.0),
+    ('love-story', (-4.0, -2.0, 0.0), -8.0),
+    ('big-don', (8.5, -1.5, 0.0), 125.0),
 )
 
 
@@ -297,26 +286,26 @@ def film(name, mat):
 # ----------------------------------------------------------------- build
 
 
-def wedge(ctx, variant, food_mats, film_mat, tag=''):
-    name = f'tiffin-{variant}{tag}'
+def wedge(ctx, variant, food_mat, film_mat):
+    name = f'tiffin-{variant}'
     box = carton(name, ctx, variant)
     win = film(name + '-film', film_mat)
-    (p0, p1) = dims.WIN_P
-    sheet, corn = food.build(name + '-sandwich', _world, (p0 - 0.7, p1 + 0.7), 0.16, food_mats, seed=7 if variant == 'love-story' else 11)
-    return [box, win, sheet, corn]
+    # The sandwich is pressed against the film (it bows in by 0.2 mm).
+    sheet = food.build(name + '-sandwich', _world, dims.WIN_X, dims.WIN_P, 0.1, food_mat)
+    return [box, win, sheet]
 
 
 def build(ctx, variant=None):
-    food_mats = food.materials()
+    food_mat = food.material(ctx.art('sandwich.png'))
     film_mat = window_film()
     if variant in (None, 'love-story', 'big-don'):
-        return wedge(ctx, variant or 'love-story', food_mats, film_mat)
-    # The set: Love Story in front, showing its window; Big Don behind and to
-    # the right, turned so the camera sees its story panel and its Aero-bics
-    # end at once, so both read as wedges.
+        return wedge(ctx, variant or 'love-story', food_mat, film_mat)
+    # The set: Love Story in front, showing its window; Big Don beside and
+    # behind it, showing its story panel and its Aero-bics end, so both read
+    # as wedges.
     objs = []
     for v, loc, rot in SET_LAYOUT:
-        parts = wedge(ctx, v, food_mats, film_mat)
+        parts = wedge(ctx, v, food_mat, film_mat)
         root = bpy.data.objects.new(f'{v}-root', None)
         bpy.context.collection.objects.link(root)
         root.location = loc

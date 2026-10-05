@@ -9,8 +9,9 @@ Per flavour:
   the rounded shoulder and the skirt.
 - body-<flavour>.svg: the body wrap strip, u = 0 at the front centre running
   right (counter-clockwise from above), v from the seam top to the neck top.
-  One white sentence runs almost all the way round; its ends meet at the back,
-  where the side seam is.
+  One white sentence runs most of the way round; its ends meet at the back,
+  where the side seam is. The seam is left unmarked: the photo shows none,
+  and at the tin's edges a printed stripe reads as a texture seam.
 """
 
 import os
@@ -28,10 +29,10 @@ U = 100  # units per cm
 
 # Print colours: the tins sampled from the photo's lit lid tops. The inks are
 # set so that, under the studio's satin lacquer (whose sheen lifts dark inks
-# by about 0.03 in linear light), the lettering renders at the photo's stroke
-# colours: blue about (50, 88, 138), crimson about (162, 48, 74).
+# by about 0.04 in linear light), the lettering renders close to the photo's
+# clear mid blue (not navy) and its crimson, about (160, 45, 72).
 FLAVOURS = {
-    'chocolate-chip': dict(tin='#91d5ea', ink='#084c88', lines=(['Chocolate chip'], ['cookies'])),
+    'chocolate-chip': dict(tin='#91d5ea', ink='#00569e', lines=(['Chocolate chip'], ['cookies'])),
     # The photo sets the plus tight: narrow gaps, not word spaces.
     'oatmeal-honey': dict(tin='#e27a9e', ink='#a00a3c', lines=(['Oatmeal', '+', 'Honey'], ['cookies'])),
 }
@@ -76,12 +77,8 @@ def body_strip(f):
             f'font-size="{fs:.1f}" fill="#ffffff">{SENTENCE}</text>'
         )
 
-    # Welded side seam at the back: a narrow stripe of clear side-stripe
-    # lacquer over bare tinplate, where the print stops.
-    seam_w = 0.10 * U
     body = (
         f'<rect width="{L:.0f}" height="{Hs:.0f}" fill="{f["tin"]}"/>'
-        f'<rect x="{L / 2 - seam_w / 2:.1f}" width="{seam_w:.1f}" height="{Hs:.0f}" fill="#c9cfd2" opacity="0.55"/>'
         # Centred on the front (u = 0), drawn twice so it wraps across the strip's ends.
         + sentence(0)
         + sentence(L)

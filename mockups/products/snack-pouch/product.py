@@ -12,18 +12,7 @@ import food  # noqa: E402
 import pouch  # noqa: E402
 
 TITLE = 'Namkeen pouch'
-SHOTS = ['hero', 'hero-right', 'front', 'side', 'back', 'low']
-
-
-def zip_plastic(m):
-    """The zip profiles and the film's cut edge: milky, half-clear
-    polyethylene. Transmission rather than transparency, so these thin lines
-    render clean (opaque alpha)."""
-    mat = m.solid('zip', '#f2f4f4', roughness=0.3)
-    p = mat.node_tree.nodes['Principled BSDF']
-    p.inputs['Transmission Weight'].default_value = 0.55
-    p.inputs['IOR'].default_value = 1.5
-    return mat
+SHOTS = ['hero', 'hero-right', 'front', 'side', 'low']
 
 
 def build(ctx, variant=None):
@@ -33,8 +22,9 @@ def build(ctx, variant=None):
     back_m = film.sheet(m, 'film-back', ctx.art('back.png'), seals)
     base_m = film.sheet(m, 'film-base')
     front, back, base = pouch.build_film(front_m, back_m, base_m)
-    edge_m = zip_plastic(m)
-    zips = pouch.build_zip(edge_m, front, back)
+    zip_m = film.milky(m, 'zip', veil=0.42)
+    edge_m = film.milky(m, 'film-edge', veil=0.55, rim=0.35)
+    zips = pouch.build_zip(zip_m, front, back)
     edges = pouch.build_edges(front, edge_m)
     food.build(m)
     return [front, back, base] + zips + [edges]

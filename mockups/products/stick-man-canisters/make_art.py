@@ -32,18 +32,19 @@ L = dims.CIRC * U
 HS = dims.ART_H * U
 
 POEM = [
-    'Stick man, stick man',
+    # As printed: no commas, every line capitalised but the second.
+    'Stick man stick man',
     'marching side by side',
-    'Stick man, stick man',
-    'got nowhere to hide',
+    'Stick man stick man',
+    'Got nowhere to hide',
     'Eat his left arm',
-    'and the right one too',
+    'And the right one too',
     'When he comes to his senses',
-    "he won’t know what to do",
+    "He won’t know what to do",
     "He’ll run and run",
-    "but there’s no place to flee",
+    "But there’s no place to flee",
     'Gobble up his left leg',
-    'and lick your lips with glee',
+    'And lick your lips with glee',
 ]
 
 INGREDIENTS = {
@@ -78,10 +79,11 @@ def f(v):
 
 
 def stick(cx, cy, length, angle, w=dims.STICK_W * U, colour=dims.STICK_COLOUR):
-    """A potato stick: a rounded bar centred on (cx, cy), tilted `angle`
-    degrees from vertical with its lower end out to the right for +angle."""
+    """A potato stick: a cut bar with softened corners (not a capsule, as in
+    the print) centred on (cx, cy), tilted `angle` degrees from vertical with
+    its lower end out to the right for +angle."""
     return (
-        f'<rect x="{f(cx - w / 2)}" y="{f(cy - length / 2)}" width="{f(w)}" height="{f(length)}" rx="{f(w * 0.46)}" '
+        f'<rect x="{f(cx - w / 2)}" y="{f(cy - length / 2)}" width="{f(w)}" height="{f(length)}" rx="{f(w * dims.STICK_ROUND)}" '
         f'fill="{colour}" transform="rotate({-angle:.2f} {f(cx)} {f(cy)})"/>'
     )
 

@@ -19,9 +19,8 @@ SHOTS = [
     {'name': 'hero-right', 'preset': 'hero-right', 'fill': 0.6},
     {'name': 'front', 'preset': 'front', 'elevation': 26, 'fill': 0.56},
     {'name': 'top', 'preset': 'top', 'fill': 0.6},
-    {'name': 'low', 'preset': 'low', 'elevation': 15, 'fill': 0.58},
+    {'name': 'low', 'preset': 'low', 'elevation': 15, 'fill': 0.64},
     {'name': 'samosa-hero', 'preset': 'hero', 'variant': 'with-samosa', 'fill': 0.64},
-    {'name': 'samosa-top', 'preset': 'top', 'variant': 'with-samosa', 'fill': 0.62},
 ]
 VARIANTS = ['bag', 'with-samosa']
 
@@ -31,25 +30,7 @@ def newsprint(m, name, art):
     return m.board(name, art=art, roughness=0.8, coat=0.0, tooth=0.05)
 
 
-def _survive_variant_switch(core):
-    """render.py resets the scene when the variant changes, but studio.core
-    keeps a module-level handle on the old light-target empty, and reading a
-    freed object raises ReferenceError in the next studio() call. Forget that
-    handle after every reset (runtime only; the shared file is untouched)."""
-    if getattr(core.reset, 'forgets_origin', False):
-        return
-    reset = core.reset
-
-    def reset_and_forget():
-        reset()
-        core._ORIGIN = None
-
-    reset_and_forget.forgets_origin = True
-    core.reset = reset_and_forget
-
-
 def build(ctx, variant=None):
-    _survive_variant_switch(ctx.core)
     m = ctx.mat
     front = newsprint(m, 'bag front', ctx.art('front.png'))
     back = newsprint(m, 'bag back', ctx.art('back.png'))

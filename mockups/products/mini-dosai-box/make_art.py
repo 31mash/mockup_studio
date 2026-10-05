@@ -84,17 +84,17 @@ def front(v):
     """The printed face (top of the sleeve), W x L, back end at the top."""
     ink = v['ink']
     cx = W / 2
-    out = [ticket_frame(54, 64, W - 54, L - 54, 50, 6, ink, 5)]
+    out = [ticket_frame(54, 64, W - 54, L - 54, 50, 6, ink, 6)]
     out.append(f'<text x="{cx}" y="156" font-family="{SLAB_LIGHT}" font-weight="800" font-size="92" letter-spacing="5" text-anchor="middle" fill="{ink}">MINI</text>')
-    out.append(outlined_word('DOSAI', cx, 322, 150, 1.1, ink, gap=6, ring=3.6))
+    out.append(outlined_word('DOSAI', cx, 328, 166, 1.02, ink, gap=6.5, ring=3.8))
     # Oval vignette: heavy outer rule, hairline inside.
     ox, oy = cx, 716
     out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="234" ry="311" fill="none" stroke="{ink}" stroke-width="6.5"/>')
     out.append(f'<ellipse cx="{ox}" cy="{oy}" rx="222" ry="299" fill="none" stroke="{ink}" stroke-width="3.8"/>')
     if v is VARIANTS['chicken']:
-        out.append(hen(247, 569, 1.08))
+        out.append(hen(205.6, 545.4, 0.4257, 0.4329))
     else:
-        out.append(potato_plant(290, 447, 1.08))
+        out.append(potato_plant(208.5, 398, 0.5, 0.507))
     # Tamil name.
     out.append(
         f'<text transform="translate({cx},1158) scale(0.86,1)" x="0" y="0" font-family="{TAMIL}" font-weight="900" '

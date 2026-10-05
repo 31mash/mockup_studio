@@ -35,10 +35,15 @@ PERIMETER = FRONT_LEN + BACK_LEN + BASE_LEN
 
 # Front panel design, in art coordinates: p along the panel (0 at the apex
 # fold, FRONT_LEN at the front-bottom fold), x across it (0 = left, the -X end).
-BLUE_BAND = 3.9  # IndiGo band from the apex fold
-ORANGE_BAND = 5.0  # Tiffin band at the bottom
-WIN_X = (0.9, 6.1)  # window aperture across the panel
-WIN_P = (BLUE_BAND - 0.35, FRONT_LEN - ORANGE_BAND + 0.25)  # it cuts a little into both bands
+# Measured on the original: the slope edge of the Soul-itude end (seen flat
+# on) shows the blue band over the top 27 % of the panel and the bottom band
+# over the last 27 %; the front photo, rectified, puts the window 1.0 cm in
+# from either side, cutting about 0.9 cm into the blue band and 0.5 cm into
+# the bottom band.
+BLUE_BAND = 4.7  # IndiGo band from the apex fold
+ORANGE_BAND = 4.75  # Tiffin band at the bottom
+WIN_X = (1.0, 6.0)  # window aperture across the panel
+WIN_P = (BLUE_BAND - 0.88, FRONT_LEN - ORANGE_BAND + 0.48)  # it cuts into both bands
 WIN_R = 0.16  # die-cut corner radius of the window
 WIN_FRAME = 0.3  # margin of the mesh cell that holds the window
 CELL_P = (WIN_P[0] - WIN_FRAME, WIN_P[1] + WIN_FRAME)

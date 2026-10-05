@@ -33,7 +33,7 @@ os.makedirs(ART, exist_ok=True)
 PAPER = '#e9e8e3'  # newsprint, flat print colour
 INK = '#2a2b2e'  # newspaper black on newsprint
 RULE = '#626367'
-STAMP = '#2459b2'  # rubber-stamp blue; multiplied over the paper it prints at about #20519e
+STAMP = '#22508f'  # rubber-stamp blue, the photo's slightly greyed denim blue (multiplied over the paper)
 
 BODY = 'Tiro Devanagari Hindi'
 HEAD = 'Noto Serif Devanagari'

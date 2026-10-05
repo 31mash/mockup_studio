@@ -307,7 +307,9 @@ def chocolate_material(m, name: str = 'chocolate'):
     slightly uneven surface, some chunks a shade milkier than others."""
     from studio.core import rgba
 
-    mat = m.solid(name, '#3b2317', roughness=0.2)
+    # Satin rather than wet: a sharper sheen picks up the tin's cyan and the
+    # grey studio as a bluish, plastic-looking highlight.
+    mat = m.solid(name, '#3b2317', roughness=0.32)
     nt = mat.node_tree
     p = nt.nodes['Principled BSDF']
     coord = nt.nodes.new('ShaderNodeTexCoord')
@@ -323,7 +325,7 @@ def chocolate_material(m, name: str = 'chocolate'):
     ramp.color_ramp.elements[1].color = rgba('#4d2d1b')
     nt.links.new(tone.outputs['Fac'], ramp.inputs['Fac'])
     nt.links.new(ramp.outputs['Color'], p.inputs['Base Color'])
-    p.inputs['Specular IOR Level'].default_value = 0.6
+    p.inputs['Specular IOR Level'].default_value = 0.5
     n = nt.nodes.new('ShaderNodeTexNoise')
     n.inputs['Scale'].default_value = 25.0
     n.inputs['Detail'].default_value = 4.0

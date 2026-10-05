@@ -10,11 +10,18 @@ Files (one set per colourway, 'love-story' and 'big-don'):
 - end-<variant>-l.svg / -r.svg: the triangle ends, seen from outside, upright,
   over the whole L x L square (right angle at bottom-left on the -X end and at
   bottom-right on the +X end).
+- sandwich.png: the cut face of the sandwich behind the window, written
+  directly (no SVG): the window of the original pack in
+  source/crops/tiffin-wedge-front.png, rectified to the window's real size
+  and lightly colour-corrected. Reproducible from the crop.
 """
 
 import math
 import os
 import sys
+
+import numpy as np
+from PIL import Image, ImageEnhance, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..'))
@@ -25,6 +32,7 @@ from brand.indigo import FONT, svg, veg_mark  # noqa: E402
 import dims  # noqa: E402
 
 U = 100  # units per cm
+ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 ART = os.path.join(HERE, 'art')
 os.makedirs(ART, exist_ok=True)
 
@@ -49,10 +57,7 @@ VARIANTS = {
 END_COLOUR = {'soulitude': LIME, 'aerobics': ORANGE}
 
 # Comfortaa advance widths in em (weight 400), measured in Chromium.
-ADV = {
-    'ro-bics': 3.63, 'Soul-itud': 4.77, 'Tiffin': 2.64, 'IndiGo': 3.40,
-    'Breathe': 4.08, 'in.': 1.19, 'out.': 1.98, ' ': 0.29,
-}
+ADV = {'ro-bics': 3.63, 'Soul-itud': 4.77}
 STEM = 0.076  # Comfortaa 400 stem, em
 
 
@@ -131,30 +136,30 @@ FL = dims.FRONT_LEN * U
 def front_panel(v):
     blue = dims.BLUE_BAND * U
     low = FL - dims.ORANGE_BAND * U
-    wp0, wp1 = dims.WIN_P[0] * U, dims.WIN_P[1] * U
     out = [
         f'<rect x="-40" y="-40" width="{FW / 2 + 40}" height="{FL + 80}" fill="{v["left"]}"/>',
         f'<rect x="{FW / 2}" y="-40" width="{FW / 2 + 40}" height="{FL + 80}" fill="{v["right"]}"/>',
         f'<rect x="-40" y="-40" width="{FW + 80}" height="{blue + 40}" fill="{BLUE}"/>',
         f'<rect x="-40" y="{low}" width="{FW + 80}" height="{FL - low + 40}" fill="{v["band"]}"/>',
     ]
-    # IndiGo wordmark, centred in the band above the window: in the photo it
-    # spans about three quarters of the panel's width.
-    F = 150
-    cap = 0.782 * F
-    base = wp0 / 2 + cap / 2 + 4
-    out.append(text(FW / 2 - 10, base, 'IndiGo', F, INK, 700, 'middle', 'letter-spacing="-1"'))
-    iw = ADV['IndiGo'] * F * 1.0 - 6
-    out.append(text(FW / 2 - 10 + iw / 2 + 7, base - cap + 16, '®', 22, INK, 400))
-    # Tiffin: IndiGo's tall, condensed rounded lettering.
-    F = 222
-    sx = 0.72
-    cap = 0.782 * F
-    base = (wp1 + FL) / 2 + cap / 2 - 6
+    # IndiGo wordmark, measured on the rectified front photo: upright, about
+    # 5.6 cm wide with a 1.38 cm cap height (IndiGo's lettering runs a little
+    # narrower than Comfortaa, so the run is fitted to its measured width),
+    # its baseline 2.75 cm below the apex fold; a small (R) by the o's shoulder.
+    F, wm = 176, 560
+    base = 275
     out.append(
-        f'<g transform="translate({FW / 2:.1f},{base:.1f}) scale({sx},1)">'
-        + text(0, 0, 'Tiffin', F, INK, 500, 'middle', 'letter-spacing="4"')
-        + '</g>'
+        f'<text x="{FW / 2 - 8:.1f}" y="{base}" font-family="{FONT}" font-weight="600" font-size="{F}" fill="{INK}" '
+        f'text-anchor="middle" textLength="{wm}" lengthAdjust="spacingAndGlyphs">IndiGo</text>'
+    )
+    out.append(text(FW / 2 - 8 + wm / 2 + 6, base - 0.53 * F + 6, '\u00ae', 24, INK, 400))
+    # Tiffin: upright, bold and only slightly narrow (4.4 cm wide, 1.5 cm
+    # cap height), sitting low in the bottom band.
+    F, wt = 195, 452
+    base = low + 0.745 * dims.ORANGE_BAND * U
+    out.append(
+        f'<text x="{FW / 2:.1f}" y="{base:.1f}" font-family="{FONT}" font-weight="700" font-size="{F}" fill="{INK}" '
+        f'text-anchor="middle" textLength="{wt}" lengthAdjust="spacingAndGlyphs">Tiffin</text>'
     )
     return ''.join(out)
 
@@ -180,6 +185,7 @@ STORIES = {
             'Reunited, the lovers ride off into the sunset.',
         ],
         40.5,
+        25.5,
     ),
     'don': (
         'Big Don',
@@ -195,25 +201,30 @@ STORIES = {
             'Baba dies in his sleep. Mintu comes back, remarries, takes care of some unfinished business '
             'and becomes the new Big Don. Khallas!',
         ],
-        44.0,
+        43.5,
+        26.5,
     ),
 }
 
 
 def back_panel(v):
-    name, paras, lead = STORIES[v['story']]
+    """Positions measured on the two back photos (cm from the apex fold):
+    'Easy to digest' on 1.4, 'stories' on 2.2, rules at 2.5 and 3.48 around
+    the story's title, the story from 4.05 down to about 11.6."""
+    name, paras, lead, size = STORIES[v['story']]
     m = 28
     out = [f'<rect x="-40" y="-40" width="{FW + 80}" height="{BL + 80}" fill="{v["back"]}"/>']
     out.append(text(FW / 2, 140, 'Easy to digest', 88, INK, 400, 'middle', 'letter-spacing="-0.5"'))
-    out.append(text(FW / 2, 217, 'stories', 60, INK, 400, 'middle'))
-    rule = lambda y: f'<rect x="{m}" y="{y - 2}" width="{FW - 2 * m}" height="4" fill="{INK}"/>'  # noqa: E731
-    out.append(rule(244))
-    out.append(text(FW / 2, 302, name, 46, INK, 400, 'middle'))
-    out.append(rule(336))
-    body = ''.join(f'<p style="margin:0 0 9px 0">{esc(p)}</p>' for p in paras)
+    out.append(text(FW / 2, 220, 'stories', 62, INK, 400, 'middle'))
+    rule = lambda y: f'<rect x="{m}" y="{y - 3}" width="{FW - 2 * m}" height="6" fill="{INK}"/>'  # noqa: E731
+    out.append(rule(250))
+    out.append(text(FW / 2, 314, name, 46, INK, 400, 'middle'))
+    out.append(rule(348))
+    body = ''.join(f'<p style="margin:0 0 {lead * 0.22:.1f}px 0">{esc(p)}</p>' for p in paras)
+    top = 405 - lead * 0.5 - size * 0.36  # first baseline on 4.05 cm
     out.append(
-        f'<foreignObject x="{m + 3}" y="{358}" width="{FW - 2 * m - 3}" height="{BL - 358}">'
-        f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:{FONT};font-weight:400;font-size:25.5px;'
+        f'<foreignObject x="{m + 3}" y="{top:.1f}" width="{FW - 2 * m - 3}" height="{BL - top}">'
+        f'<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:{FONT};font-weight:400;font-size:{size}px;'
         f'line-height:{lead}px;color:{INK};letter-spacing:-0.1px">{body}</div></foreignObject>'
     )
     return ''.join(out)
@@ -353,29 +364,29 @@ def fig_ankle(bg):
     return ''.join(o)
 
 
-def breathe_lines(starts, ys, limit):
-    """Fills lines with 'Breathe in. Breathe out.' up to each line's limit."""
-    F = 25.0
-    words = ['Breathe', 'in.', 'Breathe', 'out.']
-    k = 0
-    lines = []
-    for x0, y in zip(starts, ys):
-        w = 0.0
-        cur = []
-        while True:
-            word = words[k % 4]
-            add = ADV[word] * F + (ADV[' '] * F if cur else 0)
-            if cur and x0 + w + add > limit(y):
-                break
-            cur.append(word)
-            w += add
-            k += 1
-        lines.append((x0, y, ' '.join(cur)))
-    return lines, F
+# The breathing text as set on the pack (line for line, from the photo of the
+# Soul-itude end): five lines above the figure, seven beside it, one below.
+BREATHE = [
+    'Breathe in. Breathe out. Breathe',
+    'in. Breathe out. Breathe in. Breathe',
+    'out. Breathe in. Breathe out. Breathe',
+    'in. Breathe out. Breathe in. Breathe out.',
+    'Breathe in. Breathe out. Breathe in. Breathe',
+    'out. Breathe in. Breathe out.',
+    'Breathe in. Breathe out. Breathe',
+    'in. Breathe out. Breathe in. Breathe',
+    'out. Breathe in. Breathe out. Breathe',
+    'in. Breathe out. Breathe in. Breathe out.',
+    'Breathe in. Breathe out. Breathe in. Breathe',
+    'out. Breathe in. Breathe out. Breathe in. Breathe',
+    'out. Breathe in. Breathe out. Breathe in. Breathe out.',
+]
 
 
 def end_panel(vname, side):
-    """side 'l' = the -X end (right angle bottom-left), 'r' = the +X end (mirrored layout)."""
+    """side 'l' = the -X end (right angle bottom-left), 'r' = the +X end (mirrored layout).
+    Positions are measured on the photos of the two ends (units on the L x L
+    square, x from the vertical edge, y down from the apex)."""
     v = VARIANTS[vname]
     exercise = v['ends'][side]
     bg = END_COLOUR[exercise]
@@ -387,46 +398,91 @@ def end_panel(vname, side):
     anchor = 'end' if mir else 'start'
     o = [f'<rect width="{E}" height="{E}" fill="{bg}"/>']
 
-    def icon(g, x, y, w):
+    def icon(g, x, y, w, sc=1.0):
         # On the +X end the icon keeps its drawing (a raised right arm stays
         # the right arm); only its place is mirrored.
-        return f'<g transform="translate({(E - x - w) if mir else x:.1f},{y:.1f})">{g}</g>'
+        return f'<g transform="translate({(E - x - w * sc) if mir else x:.1f},{y:.1f}) scale({sc})">{g}</g>'
+
+    def big_title(parts, x, base, F, sx=1.0):
+        t, _ = title(parts, X(x), base, F, anchor=anchor)
+        ax = X(x)
+        return f'<g transform="translate({ax:.1f},{base}) scale({sx},1) translate({-ax:.1f},{-base})">{t}</g>'
 
     if exercise == 'soulitude':
-        F = 25.0
         for i, s in enumerate(['Here are some', 'breathing exercises', 'to attain peace', 'of mind:']):
-            o.append(text(X(66), 334 + i * 36, s, F, anchor=anchor))
-        o.append(f'<rect x="{min(X(66), X(382)):.1f}" y="469" width="316" height="3" fill="{INK}"/>')
-        ys = [534 + 36 * i for i in range(13)]
-        starts = [66] * 5 + [268] * 7 + [66]
-        lines, F = breathe_lines(starts, ys, lambda y: y - 66)
-        for x0, y, s in lines:
-            o.append(text(X(x0), y, s, F, anchor=anchor))
-        o.append(icon(meditating(bg), 72, 716, 164))
-        t, _ = title(['Soul-itud', 'e'], X(58), 1183, 158, anchor=anchor)
-        o.append(t)
+            o.append(text(X(62), 352 + i * 36.5, s, 23, anchor=anchor))
+        o.append(f'<rect x="{min(X(60), X(390)):.1f}" y="501" width="330" height="3" fill="{INK}"/>')
+        for i, s in enumerate(BREATHE):
+            x0 = 250 if 5 <= i <= 11 else 62
+            o.append(text(X(x0), 561 + 36.9 * i, s, 21.5, anchor=anchor))
+        o.append(icon(meditating(bg), 57, 754, 164, 0.97))
+        # IndiGo's lettering is a little narrower than Comfortaa's.
+        o.append(big_title(['Soul-itud', 'e'], 58, 1184, 158, 0.93))
     else:
-        F = 24
         for i, s in enumerate(['Follow', 'these simple', 'stretching exercises to', 'enjoy a relaxed flight:']):
-            o.append(text(X(98), 380 + i * 35, s, F, anchor=anchor))
-        o.append(f'<rect x="{min(X(90), X(420)):.1f}" y="523" width="330" height="3" fill="{INK}"/>')
+            o.append(text(X(104), 345 + i * 35, s, 22, anchor=anchor))
+        o.append(f'<rect x="{min(X(104), X(430)):.1f}" y="489" width="326" height="3" fill="{INK}"/>')
         rows = [
-            (fig_shoulders, 86, 552, 186, ['Rotate your', 'shoulders backward', 'and forward.']),
-            (fig_arm, 90, 716, 186, ['Raise your right arm over your', 'head and stretch. Repeat with', 'your left arm.']),
-            (fig_neck, 88, 876, 186, ['Rotate your neck', 'clockwise and', 'anticlockwise.']),
-            (fig_ankle, 412, 876, 528, ['Rotate your left', 'ankle ten times. Repeat', 'with your right ankle.']),
+            (fig_shoulders, 92, 515, 195, ['Rotate your', 'shoulders backward', 'and forward.']),
+            (fig_arm, 94, 682, 195, ['Raise your right arm over your', 'head and stretch. Repeat with', 'your left arm.']),
+            (fig_neck, 92, 852, 195, ['Rotate your neck', 'clockwise and', 'anticlockwise.']),
+            (fig_ankle, 432, 852, 540, ['Rotate your left', 'ankle ten times. Repeat', 'with your right ankle.']),
         ]
         for fig, ix, iy, tx, tl in rows:
             o.append(icon(fig(bg), ix, iy, 90 if fig is fig_ankle else 72))
             for i, s in enumerate(tl):
-                o.append(text(X(tx), iy + 30 + i * 36, s, F, anchor=anchor))
-        t, _ = title(['A', 'e', 'ro-bics'], X(80), 1188, 176, anchor=anchor)
-        o.append(t)
+                o.append(text(X(tx), iy + 30 + i * 36, s, 24, anchor=anchor))
+        o.append(big_title(['A', 'e', 'ro-bics'], 88, 1178, 176))
     open(os.path.join(ART, f'end-{vname}-{side}.svg'), 'w').write(svg(E, E, ''.join(o), px=4096))
+
+
+# ----------------------------------------------------------------- sandwich
+
+# The window of the original pack in the front crop (pixels): its four
+# corners, found as the edges of the printed strips around it.
+CROP = os.path.join(ROOT, 'source', 'crops', 'tiffin-wedge-front.png')
+WINDOW_QUAD = [(130.3, 127.0), (336.0, 127.0), (321.0, 458.0), (82.0, 458.0)]  # TL TR BR BL
+
+
+def _homography(src, dst):
+    """Coefficients (a..h) mapping src points to dst points."""
+    A, B = [], []
+    for (x, y), (u, w) in zip(src, dst):
+        A.append([x, y, 1, 0, 0, 0, -u * x, -u * y])
+        B.append(u)
+        A.append([0, 0, 0, x, y, 1, -w * x, -w * y])
+        B.append(w)
+    return np.linalg.solve(np.array(A, float), np.array(B, float))
+
+
+def _apply(c, x, y):
+    w = c[6] * x + c[7] * y + 1
+    return (c[0] * x + c[1] * y + c[2]) / w, (c[3] * x + c[4] * y + c[5]) / w
+
+
+def sandwich():
+    """The window's contents, rectified to the window's real size (100 px per
+    cm, the top of the image towards the apex), with a small inset so the
+    die-cut edge and the printed strips stay out. The crop is a dull print:
+    stretch its levels a little and give back some colour."""
+    (x0, x1), (p0, p1) = dims.WIN_X, dims.WIN_P
+    wp, hp = round((x1 - x0) * 100), round((p1 - p0) * 100)
+    unit = _homography([(0, 0), (1, 0), (1, 1), (0, 1)], WINDOW_QUAD)
+    iu, iv = 0.015, 0.012
+    corners = [_apply(unit, u, w) for u, w in ((iu, iv), (1 - iu, iv), (1 - iu, 1 - iv), (iu, 1 - iv))]
+    c = _homography([(0, 0), (wp, 0), (wp, hp), (0, hp)], corners)
+    im = Image.open(CROP).convert('RGB').transform((wp, hp), Image.PERSPECTIVE, tuple(c), Image.BICUBIC)
+    a = np.asarray(im).astype(float) / 255
+    a = np.clip((a - 0.045) / (0.95 - 0.045), 0, 1)
+    im = Image.fromarray((a * 255 + 0.5).astype(np.uint8))
+    im = ImageEnhance.Color(im).enhance(1.06)
+    im = im.filter(ImageFilter.UnsharpMask(radius=2.5, percent=40, threshold=2))
+    im.save(os.path.join(ART, 'sandwich.png'))
 
 
 for vn in VARIANTS:
     tube(vn)
     end_panel(vn, 'l')
     end_panel(vn, 'r')
+sandwich()
 print('art written')

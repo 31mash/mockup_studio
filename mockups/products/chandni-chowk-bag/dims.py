@@ -16,7 +16,7 @@ PAPER = 0.012  # newsprint: two layers at the edges, but thin
 FOLD_R = 0.07  # outer radius of the top fold (four layers of paper)
 FOLD_ARC = math.pi * FOLD_R * 0.75  # paper used by the fold's visible arc
 
-PUFF = 2.5  # how far the samosa inside lifts the front panel, at its peak (see bag.SUPPORT)
+PUFF = 2.1  # how far the samosa inside lifts the front panel, at its peak (see bag.SUPPORT)
 EDGE_Z = 0.26  # the folded edges ride this far off the floor
 BELLY = 0.22  # fraction of the half-width over which the back panel reaches the floor
 

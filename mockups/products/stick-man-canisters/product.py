@@ -4,9 +4,11 @@ silver peel-off foil under the top seam, and printed paper labels on which a
 parade of potato-stick men gets eaten from can to can.
 
 Variants: 'brown', 'pink', 'navy', and 'set' (the three in a row, as in the
-spread). A variant may end in '@<azimuth>': the can (or each can of the set)
-is turned so the label front measured from the spread faces a camera at that
-azimuth, so a hero shot shows the same stretch of label as the photo.
+spread), optionally turned:
+
+    'navy@31'           the label's front as in the spread faces a camera at azimuth 31
+    'navy:100@31'       the label at 100 degrees right of that front faces it instead
+    'set:-20,0,95@31'   the same, one angle per can (brown, pink, navy)
 """
 
 import math
@@ -20,33 +22,94 @@ import can  # noqa: E402
 import dims  # noqa: E402
 
 TITLE = 'Stick Man potato-stick canisters'
+
+
+def _turned(name, at, azimuth):
+    return f'{name}:{at:g}@{azimuth:g}'
+
+
 SHOTS = [
-    {'name': 'hero', 'preset': 'hero', 'variant': 'brown@31'},
-    {'name': 'hero-right', 'preset': 'hero-right', 'variant': 'brown'},
-    {'name': 'front', 'preset': 'front', 'variant': 'brown'},
-    {'name': 'pink-hero', 'preset': 'hero', 'variant': 'pink@31'},
-    {'name': 'navy-hero', 'preset': 'hero', 'variant': 'navy@126'},
-    {'name': 'set-hero', 'preset': 'hero', 'variant': 'set@31', 'fill': 0.66},
+    # Each can's hero turns its title panel to the lens, with the first stick
+    # man coming round on the right.
+    {'name': 'hero', 'preset': 'hero', 'variant': _turned('brown', dims.HERO_AT['brown'], 31)},
+    {'name': 'front', 'preset': 'front', 'variant': _turned('brown', -12, 0)},
+    {'name': 'pink-hero', 'preset': 'hero', 'variant': _turned('pink', dims.HERO_AT['pink'], 31)},
+    {'name': 'navy-hero', 'preset': 'hero', 'variant': _turned('navy', dims.HERO_AT['navy'], 31)},
+    # The set as a story: the brown's title and whole men, the pink's men
+    # losing their limbs, the navy's title beside the last heads.
+    {'name': 'set-hero', 'preset': 'hero', 'variant': 'set:-20,0,95@31', 'fill': 0.66},
+    # As in the spread: each can shows the same stretch of label as the photo.
     {'name': 'set-front', 'preset': 'front', 'variant': 'set', 'fill': 0.74},
-    {'name': 'set-top', 'preset': 'top', 'variant': 'set', 'fill': 0.72},
+    {'name': 'set-top', 'preset': 'top', 'variant': 'set', 'fill': 0.74},
 ]
 VARIANTS = ['brown', 'pink', 'navy', 'set']
 
 
-@bpy.app.handlers.persistent
-def _forget_light_target(*_):
-    """studio.core caches its light-target empty in core._ORIGIN, and
-    core.reset() frees that object; when render.py rebuilds the scene for the
-    next variant, core.studio() would trip over the stale reference. Clearing
-    the cache after each reset avoids that without touching the studio."""
-    from studio import core
-
-    core._ORIGIN = None
+def _linear(hexc):
+    c = int(hexc[1:3], 16) / 255, int(hexc[3:5], 16) / 255, int(hexc[5:7], 16) / 255
+    return [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c]
 
 
-for _h in (bpy.app.handlers.load_factory_startup_post, bpy.app.handlers.load_post):
-    if not any(getattr(f, '__name__', '') == '_forget_light_target' for f in _h):
-        _h.append(_forget_light_target)
+def _srgb_hex(lin):
+    out = []
+    for v in lin:
+        v = max(0.0, min(1.0, v))
+        s = v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055
+        out.append(round(s * 255))
+    return '#%02x%02x%02x' % tuple(out)
+
+
+def printed_foil(ctx, name, art):
+    """The peel-off membrane: lacquered aluminium foil printed in one colour.
+    Bare foil (the artwork's silver and its pressed seal rings) is metallic;
+    the ink is opaque and diffuse. The ink is found by its distance from the
+    bare foil's colour in the artwork."""
+    m = ctx.mat
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    p = nt.nodes['Principled BSDF']
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = m.image(art)
+    tex.interpolation = 'Cubic'
+    tex.extension = 'EXTEND'
+    silver = nt.nodes.new('ShaderNodeCombineXYZ')
+    for i, v in enumerate(_linear(dims.FOIL_SILVER)):
+        silver.inputs[i].default_value = v
+    dist = nt.nodes.new('ShaderNodeVectorMath')
+    dist.operation = 'DISTANCE'
+    nt.links.new(tex.outputs['Color'], dist.inputs[0])
+    nt.links.new(silver.outputs[0], dist.inputs[1])
+    ink = nt.nodes.new('ShaderNodeMapRange')  # 0 on bare foil (seal rings included), 1 on ink
+    ink.inputs['From Min'].default_value = 0.3
+    ink.inputs['From Max'].default_value = 0.55
+    nt.links.new(dist.outputs['Value'], ink.inputs['Value'])
+    tint = nt.nodes.new('ShaderNodeMix')
+    tint.data_type = 'RGBA'
+    tint.blend_type = 'MULTIPLY'
+    tint.inputs['Factor'].default_value = 1.0
+    # Mix node sockets by index: 6 and 7 are the colour inputs A and B, 2 the colour result.
+    nt.links.new(tex.outputs['Color'], tint.inputs[6])
+    tint.inputs[7].default_value = (dims.FOIL_TINT, dims.FOIL_TINT, dims.FOIL_TINT * 1.01, 1.0)
+    base = nt.nodes.new('ShaderNodeMix')
+    base.data_type = 'RGBA'
+    nt.links.new(ink.outputs['Result'], base.inputs[0])
+    nt.links.new(tint.outputs[2], base.inputs[6])
+    nt.links.new(tex.outputs['Color'], base.inputs[7])
+    nt.links.new(base.outputs[2], p.inputs['Base Color'])
+    metal = nt.nodes.new('ShaderNodeMapRange')
+    metal.inputs['To Min'].default_value = dims.FOIL_METALLIC
+    metal.inputs['To Max'].default_value = 0.0
+    nt.links.new(ink.outputs['Result'], metal.inputs['Value'])
+    nt.links.new(metal.outputs['Result'], p.inputs['Metallic'])
+    rough = nt.nodes.new('ShaderNodeMapRange')
+    rough.inputs['To Min'].default_value = dims.FOIL_ROUGH
+    rough.inputs['To Max'].default_value = 0.42
+    nt.links.new(ink.outputs['Result'], rough.inputs['Value'])
+    nt.links.new(rough.outputs['Result'], p.inputs['Roughness'])
+    p.inputs['Coat Weight'].default_value = 0.05
+    p.inputs['Coat Roughness'].default_value = 0.2
+    return mat
 
 
 def materials(ctx, colour, cache):
@@ -54,14 +117,15 @@ def materials(ctx, colour, cache):
     if 'gold' not in cache:
         # Gold-lacquered tinplate ends, as in the photo.
         cache['gold'] = m.bare_metal('gold lacquer', color='#cdb67c', roughness=0.24)
-        # The pull tab: the membrane's unprinted foil, folded back. Peel-off
-        # foils carry a heat-seal lacquer: a soft satin silver, not a mirror
-        # (a mirror would blow out under the overhead softbox in a top view).
-        cache['foil'] = m.printed_metal('peel foil', color='#d6d7da', roughness=0.36, coat=0.1, metallic=0.55)
+        # The pull tab: the membrane's unprinted foil, folded back.
+        bare = _srgb_hex([v * dims.FOIL_TINT for v in _linear(dims.FOIL_SILVER)])
+        cache['foil'] = m.printed_metal('peel foil', color=bare, roughness=dims.FOIL_ROUGH, coat=0.05, metallic=dims.FOIL_METALLIC)
     if colour not in cache:
-        paper = m.board(f'label {colour}', art=ctx.art(f'label-{colour}.png'), roughness=0.42, coat=0.14, tooth=0.025)
-        # The membrane: printed foil. Ink on foil stays metallic, tinted.
-        lid = m.printed_metal(f'foil {colour}', art=ctx.art(f'lid-{colour}.png'), roughness=0.36, coat=0.1, metallic=0.55)
+        # Uncoated label paper: a soft sheen but no varnish, so the dark
+        # browns and navies keep their depth instead of greying over.
+        paper = m.board(f'label {colour}', art=ctx.art(f'label-{colour}.png'), roughness=0.5, coat=0.0, tooth=0.025)
+        paper.node_tree.nodes['Principled BSDF'].inputs['Specular IOR Level'].default_value = 0.2
+        lid = printed_foil(ctx, f'foil {colour}', ctx.art(f'lid-{colour}.png'))
         cache[colour] = (paper, lid)
     paper, lid = cache[colour]
     return paper, lid, cache['gold'], cache['foil']
@@ -90,16 +154,25 @@ def one_can(ctx, cache, colour, x=0.0, face=0.0):
     return body + top
 
 
+def parse(variant):
+    """'name[:a[,b,c]][@azimuth]' -> name, label angles facing the camera, azimuth."""
+    name, _, az = (variant or 'brown').partition('@')
+    name, _, at = name.partition(':')
+    angles = [float(v) for v in at.split(',')] if at else []
+    return name, angles, float(az) if az else 0.0
+
+
 def build(ctx, variant=None):
-    name, _, face = (variant or 'brown').partition('@')
-    face = float(face) if face else 0.0
+    name, angles, az = parse(variant)
     cache = {}
     if name == 'set':
+        angles = angles or [0.0] * len(dims.SET_ORDER)
         objs = []
         for i, colour in enumerate(dims.SET_ORDER):
-            objs += one_can(ctx, cache, colour, x=(i - 1) * dims.SET_STEP, face=face)
+            # A label angle `a` faces the camera when the can turns by a + azimuth.
+            objs += one_can(ctx, cache, colour, x=(i - 1) * dims.SET_STEP, face=angles[i] + az)
     elif name in dims.CANS:
-        objs = one_can(ctx, cache, name, face=face)
+        objs = one_can(ctx, cache, name, face=(angles[0] if angles else 0.0) + az)
     else:
         raise ValueError(f'unknown variant {variant!r}')
     bpy.context.view_layer.update()

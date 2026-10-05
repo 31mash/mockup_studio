@@ -21,5 +21,17 @@ KRAFT_INSIDE = '#c9aa7a'
 
 # Front print, in cm from the front panel's top-left corner.
 FRAME = (0.65, 6.0, 11.2, 11.75)  # x, y, w, h of the frame's outer edge
-BAND = 0.24  # frame band width
+BAND = 0.27  # frame band width (the rope rule)
+# 'Bunji!': baseline start (from the frame's outer corner), font size, how
+# steeply the baseline climbs (a shear, so stems keep their forward lean)
+# and a slight widening towards the hand-lettered original's broad letters.
+LETTER_AT = (0.95, 4.72)
+LETTER_SIZE = 2.02
+LETTER_RISE = 20
+LETTER_WIDEN = 1.08
+LETTER_UNSLANT = 6
+# The paragraph: 'No.' baseline (from the frame's corner), size and leading.
+COPY_AT = (1.0, 5.95)
+COPY_SIZE = 0.245
+COPY_LEAD = 0.30
 SEAM_X = 3.4  # glue seam on the back, from the back's left edge seen from behind

@@ -15,40 +15,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dims  # noqa: E402
 
 
-def _guard_studio_reset():
-    """Workaround for a studio bug hit by any product with VARIANTS: after
-    core.reset() empties the scene, core._ORIGIN still points at the removed
-    light-target empty, and core.studio() raises ReferenceError on it when
-    render.py rebuilds for the next variant. Clearing it after each reset
-    lets studio() make a fresh one. Changes nothing else; remove once
-    studio/core.py resets _ORIGIN itself."""
-    from studio import core
-
-    if getattr(core.reset, 'clears_origin', False):
-        return
-    original = core.reset
-
-    def reset():
-        original()
-        core._ORIGIN = None
-
-    reset.clears_origin = True
-    core.reset = reset
-
-
-_guard_studio_reset()
-
 TITLE = 'Mini Dosai box'
 VARIANTS = [None, 'veg', 'pair']
 SHOTS = [
     'hero',
     'hero-right',
+    # A flat pack seen at the preset's 10 degrees shows only the drawer end:
+    # raised so the printed face reads.
     {'name': 'front', 'preset': 'front', 'elevation': 30, 'fill': 0.5},
     'top',
-    {'name': 'low', 'preset': 'low', 'elevation': 16, 'azimuth': 34},
-    {'name': 'veg-hero', 'preset': 'hero', 'variant': 'veg'},
     {'name': 'pair-hero', 'preset': 'hero', 'variant': 'pair', 'fill': 0.62},
-    {'name': 'pair-top', 'preset': 'top', 'variant': 'pair', 'fill': 0.52},
+    {'name': 'low', 'preset': 'low', 'elevation': 16, 'azimuth': 34},
 ]
 
 
@@ -162,31 +139,49 @@ def drawer(name, mat, x, y_front, z0):
     return ob
 
 
-def _rrect(w, d, r, seg):
-    """Rounded rectangle outline (CCW from above) with, per point, its
-    phase along its corner arc (0..1) for the foil pleats, and outward normal."""
+def _rrect(w, d, r, n_long, n_short, n_corner):
+    """Rounded rectangle outline, CCW from above, with the same number of
+    points on every ring (so rings of different sizes line up): per point
+    (x, y, corner phase 0..1 or -1 on a straight side, outward normal x, y,
+    position along the outline 0..1)."""
     hw, hd = w / 2, d / 2
     out = []
-    for (cx, cy), a0 in (((hw - r, -hd + r), -90), ((hw - r, hd - r), 0), ((-hw + r, hd - r), 90), ((-hw + r, -hd + r), 180)):
-        for i in range(seg + 1):
-            a = math.radians(a0 + 90 * i / seg)
-            out.append((cx + r * math.cos(a), cy + r * math.sin(a), i / seg, math.cos(a), math.sin(a)))
-    return out
+    corners = (((hw - r, -hd + r), -90), ((hw - r, hd - r), 0), ((-hw + r, hd - r), 90), ((-hw + r, -hd + r), 180))
+    # side after each corner: right (+x, runs along y), back, left, front
+    for c, ((cx, cy), a0) in enumerate(corners):
+        for i in range(n_corner):
+            a = math.radians(a0 + 90 * i / n_corner)
+            out.append((cx + r * math.cos(a), cy + r * math.sin(a), i / n_corner, math.cos(a), math.sin(a)))
+        a = math.radians(a0 + 90)
+        nx, ny = math.cos(a), math.sin(a)
+        (ex, ey), _ = corners[(c + 1) % 4]
+        sx, sy = cx + r * nx, cy + r * ny
+        tx, ty = ex + r * nx, ey + r * ny
+        n = n_long if c in (0, 2) else n_short
+        for i in range(n):
+            t = i / n
+            out.append((sx + (tx - sx) * t, sy + (ty - sy) * t, -1.0, nx, ny))
+    m = len(out)
+    return [p + (k / m,) for k, p in enumerate(out)]
 
 
 def foil_tray(ctx, name, mat, x, y, z0):
-    """A rectangular aluminium container: tapered walls with pleated corners,
-    a flat rim and a rolled edge."""
-    seg = 28
+    """A pressed aluminium container: tapered walls gathered into pleats at
+    the corners, a wide flat flange crimped all round, and a rolled lip."""
+    from mathutils import Vector
+    from mathutils.noise import noise
+
+    n_long, n_short, n_corner = 260, 150, 44
     pleats = 7
     rim_w = dims.TRAY_W - 2 * (dims.FLANGE + dims.BEAD)
     rim_l = dims.TRAY_L - 2 * (dims.FLANGE + dims.BEAD)
     rim_r = max(0.3, dims.TRAY_R - dims.FLANGE - dims.BEAD)
     dr = dims.TRAY_DRAFT
-    fil = 0.22  # floor fillet
+    fil = 0.2  # floor fillet
     h = dims.TRAY_H
-    rings = []  # (w, l, r, z, pleat amplitude radial, pleat amplitude z)
-    rings.append((rim_w - 2 * dr - 2 * fil, rim_l - 2 * dr - 2 * fil, max(0.2, rim_r - dr - fil), 0.0, 0.0, 0.0))
+    b = dims.BEAD
+    # (w, l, r, z, wall pleat, flange crimp weight, lip): one per ring
+    rings = [(rim_w - 2 * dr - 2 * fil, rim_l - 2 * dr - 2 * fil, max(0.2, rim_r - dr - fil), 0.0, 0.0, 0.0)]
     for k in range(1, 4):
         a = math.radians(90 * k / 3)
         off = fil * (1 - math.sin(a)) + dr
@@ -194,39 +189,56 @@ def foil_tray(ctx, name, mat, x, y, z0):
     for k in range(1, 7):
         t = k / 6
         off = dr * (1 - t)
-        rings.append((rim_w - 2 * off, rim_l - 2 * off, rim_r - off, fil + (h - fil) * t, 0.035 * t ** 1.5, 0.0))
-    for k in range(1, 4):
-        f = dims.FLANGE * k / 3
-        rings.append((rim_w + 2 * f, rim_l + 2 * f, rim_r + f, h, 0.03, 0.022 * (k / 3)))
+        rings.append((rim_w - 2 * off, rim_l - 2 * off, rim_r - off, fil + (h - fil) * t, 0.04 * t ** 1.5, 0.0))
+    for k in range(1, 6):
+        f = dims.FLANGE * k / 5
+        rings.append((rim_w + 2 * f, rim_l + 2 * f, rim_r + f, h, 0.03, min(1.0, k / 2)))
+    # the rolled lip: out and down round the bead radius
+    for k in range(1, 6):
+        a = math.radians(180 * k / 5)
+        f = dims.FLANGE + b * math.sin(a) * 0.9
+        rings.append((rim_w + 2 * f, rim_l + 2 * f, rim_r + f, h - b * (1 - math.cos(a)) * 0.75, 0.03, 1.0))
     bm = bmesh.new()
     vrings = []
-    for rw, rl, rr, rz, amp, zamp in rings:
+    for rw, rl, rr, rz, amp, crimp in rings:
         ring = []
-        for px, py, ph, nx, ny in _rrect(rw, rl, rr, seg):
-            s = math.sin(ph * math.pi * pleats * 2)
-            ring.append(bm.verts.new((x + px + nx * amp * s, y + py + ny * amp * s, z0 + rz + zamp * s)))
+        for px, py, ph, nx, ny, s in _rrect(rw, rl, rr, n_long, n_short, n_corner):
+            # Corner pleats on the walls and flange.
+            pl = math.sin(ph * math.pi * pleats * 2) if ph >= 0 else 0.0
+            dz = 0.022 * pl * (crimp > 0)
+            dn = amp * pl
+            if amp and not crimp:
+                # The walls: soft vertical ripples left by the press, growing
+                # towards the rim.
+                dn += amp / 0.04 * 0.02 * noise(Vector((s * 70.0, 3.3, 0.0)))
+            if crimp:
+                # Crimps all round the flange: fine ridges, a little uneven,
+                # over a slow waviness where the foil was pressed.
+                q = s * 300.0
+                ridge = math.sin(q * math.pi + 1.8 * noise(Vector((s * 40.0, 0.3, 0.0))))
+                depth = 0.5 + 1.4 * abs(noise(Vector((s * 18.0, 2.9, 0.0))))
+                dz += crimp * (0.009 * ridge * depth + 0.02 * noise(Vector((s * 26.0, 1.7, 0.0))) + 0.008 * noise(Vector((s * 130.0, 6.3, 0.0))))
+                dn += crimp * (0.018 * noise(Vector((s * 55.0, 4.1, 0.0))) + 0.01 * noise(Vector((s * 150.0, 8.7, 0.0))))
+            ring.append(bm.verts.new((x + px + nx * dn, y + py + ny * dn, z0 + rz + dz)))
         vrings.append(ring)
     bm.faces.new(list(reversed(vrings[0])))
     n = len(vrings[0])
-    for a, b in zip(vrings[:-1], vrings[1:]):
+    for a, b_ in zip(vrings[:-1], vrings[1:]):
         for i in range(n):
             j = (i + 1) % n
-            bm.faces.new([a[i], a[j], b[j], b[i]])
+            bm.faces.new([a[i], a[j], b_[j], b_[i]])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    ob = _new_object(name, bm, [mat], smooth_angle=60)
+    ob = _new_object(name, bm, [mat], smooth_angle=70)
     so = ob.modifiers.new('foil', 'SOLIDIFY')
     so.thickness = 0.012
     so.offset = 0.0
-    # Rolled edge round the rim.
-    edge = [(x + px, y + py) for px, py, *_ in _rrect(rim_w + 2 * dims.FLANGE + dims.BEAD * 0.8, rim_l + 2 * dims.FLANGE + dims.BEAD * 0.8, rim_r + dims.FLANGE, 12)]
-    bead = ctx.shapes.torus_ring(name + '-bead', edge, z0 + h - dims.BEAD * 0.75, dims.BEAD, mat, seg=10)
-    return [ob, bead]
+    return [ob]
 
 
 def crinkled_foil(ctx, name):
     """The studio's foil, crumpled harder, as a pressed tray's rim and walls
-    are: its coarse facets plus a fine crinkle."""
-    m = ctx.mat.foil(name, roughness=0.26, crinkle=0.4)
+    are: its facets plus a fine crinkle and a coarse crumple."""
+    m = ctx.mat.foil(name, roughness=0.3, crinkle=0.45)
     nt = m.node_tree
     p = nt.nodes['Principled BSDF']
     coarse = p.inputs['Normal'].links[0].from_node
@@ -237,9 +249,20 @@ def crinkled_foil(ctx, name):
     n.inputs['Distortion'].default_value = 0.8
     nt.links.new(coord.outputs['Object'], n.inputs['Vector'])
     b = nt.nodes.new('ShaderNodeBump')
-    b.inputs['Strength'].default_value = 0.4
+    b.inputs['Strength'].default_value = 0.55
     b.inputs['Distance'].default_value = 0.01
     nt.links.new(n.outputs['Fac'], b.inputs['Height'])
+    # and a coarse crumple, so broad faces break their reflections into facets
+    n2 = nt.nodes.new('ShaderNodeTexNoise')
+    n2.inputs['Scale'].default_value = 3.5
+    n2.inputs['Detail'].default_value = 4.0
+    n2.inputs['Distortion'].default_value = 1.5
+    nt.links.new(coord.outputs['Object'], n2.inputs['Vector'])
+    b2 = nt.nodes.new('ShaderNodeBump')
+    b2.inputs['Strength'].default_value = 0.35
+    b2.inputs['Distance'].default_value = 0.03
+    nt.links.new(n2.outputs['Fac'], b2.inputs['Height'])
+    nt.links.new(b2.outputs['Normal'], b.inputs['Normal'])
     nt.links.new(b.outputs['Normal'], coarse.inputs['Normal'])
     return m
 
@@ -333,28 +356,28 @@ def dosa_material(ctx, name='dosa'):
         return math_('MULTIPLY', spot, on)
 
     # Golden crepe, lighter and yellower where it is thin.
-    base = ramp(broad, [(0.28, '#f2a84f'), (0.5, '#e78f3a'), (0.74, '#d6782d')])
+    base = ramp(broad, [(0.28, '#f5a847'), (0.5, '#ea8c31'), (0.74, '#da7526')])
     light = ramp(broad, [(0.0, '#f6bd68'), (1.0, '#efb05a')])
     col = mix(base, light, ramp(noise(3.2, 4.0, 0.6, vec=wc), [(0.5, 0.0), (0.66, 0.7)]))
     amber = ramp(broad, [(0.2, '#c96b24'), (0.8, '#b85e1e')])
-    col = mix(col, amber, ramp(patch, [(0.48, 0.0), (0.76, 0.6)]))
+    col = mix(col, amber, ramp(patch, [(0.44, 0.0), (0.72, 0.75)]))
     # The honeycomb of browned pores: orange-brown spots with darker cores.
-    p1 = pits(3.6, 0.46, 0.9, 0.3, soft=0.6)
-    p2 = pits(6.8, 0.46, 0.75, 5.1, soft=0.6)
+    p1 = pits(5.0, 0.4, 0.95, 0.3, soft=0.5)
+    p2 = pits(8.5, 0.3, 0.5, 5.1, soft=0.55)
     sp = math_('MAXIMUM', p1, p2)
-    pore = ramp(broad, [(0.0, '#b9541a'), (1.0, '#a34816')])
+    pore = ramp(broad, [(0.0, '#a04816'), (1.0, '#8f3f13')])
     col = mix(col, pore, math_('MINIMUM', math_('MULTIPLY', sp, 1.5), 0.92))
-    core_ = ramp(sp, [(0.55, 0.0), (0.98, 0.6)])
-    dark = ramp(broad, [(0.0, '#7a3510'), (1.0, '#652a0b')])
+    core_ = ramp(sp, [(0.6, 0.0), (0.98, 0.4)])
+    dark = ramp(broad, [(0.0, '#5e260a'), (1.0, '#4e1f08')])
     col = mix(col, dark, core_)
     # A faint lace where the batter caught.
-    lace = ramp(noise(7.0, 6.0, 0.66, distortion=1.1, vec=wc), [(0.47, 0.0), (0.52, 0.35), (0.57, 0.0)])
+    lace = ramp(noise(3.2, 6.0, 0.66, distortion=1.3, vec=wc), [(0.45, 0.0), (0.5, 0.18), (0.55, 0.0)])
     col = mix(col, pore, lace)
     L(col, p.inputs['Base Color'])
 
     # Relief: the pores are shallow pits, a soft undulation over all.
     b1 = N('ShaderNodeBump')
-    b1.inputs['Strength'].default_value = 0.5
+    b1.inputs['Strength'].default_value = 0.3
     b1.inputs['Distance'].default_value = 0.02
     b1.invert = True
     L(sp, b1.inputs['Height'])
@@ -387,10 +410,10 @@ def dosa_parcel(name, mat, x, y_front, z_floor, seed):
     A = dims.PIECE_L / 2 * (1 + rnd.uniform(-0.03, 0.015))
     B = dims.PIECE_D / 2 * (1 + rnd.uniform(-0.04, 0.02))
     C = dims.PIECE_H / 2 * (1 + rnd.uniform(-0.05, 0.03))
-    E = 1.05  # length of each rounded, tucked end
-    ex = 4.4  # section squareness (2 = ellipse)
-    lap = 0.075  # crepe thickness: the step at its outer edge
-    seam0 = math.radians(128 + rnd.uniform(-8, 8))  # front shoulder
+    E = 0.6  # length of each rounded, tucked end
+    ex = 5.5  # section squareness (2 = ellipse)
+    lap = 0.1  # crepe thickness: the step at its outer edge
+    seam0 = math.radians(108 + rnd.uniform(-6, 6))  # across the top, near the front
     bow = rnd.uniform(-0.09, 0.09)
     yaw = math.radians(rnd.uniform(-1.6, 1.6))
     pivot = 0.28 * C  # the tucked ends fold down towards the floor
@@ -410,8 +433,8 @@ def dosa_parcel(name, mat, x, y_front, z_floor, seed):
     span = 2 * math.pi - 0.012  # the last column sits just short of the lap edge
     rows = []
     for xx, s in xs:
-        sy = s ** 0.42
-        sz = s ** 0.85
+        sy = s ** 0.3
+        sz = s ** 0.6
         seam = seam0 + 0.1 * noise(Vector((xx * 0.8 + seed, 0.3, 1.7)))
         row = []
         for k in range(nsec):

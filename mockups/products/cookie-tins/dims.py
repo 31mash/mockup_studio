@@ -37,7 +37,13 @@ CIRC = 2 * math.pi * RB  # wrap strip length
 # Body sentence: centred at this height (the photo: a little below the middle
 # of the visible wall).
 TEXT_Z = ART_Z0 + 0.45 * (Z_SHOULDER - ART_Z0)
-TEXT_SIZE = 0.60  # font size, cm: the sentence (44.7 em) runs 26.8 cm of the 28.2 cm round
+# Font size, cm. The photo measures about 0.60, but at that size the sentence
+# (44.7 em) runs 26.8 cm of the 28.2 cm round, and its gap at the back (18
+# degrees) is narrower than the stretch a camera sees beyond the edges of a
+# tin: the set's end tins showed 'Enjoy.' or 'For' creeping round their
+# edges. At 0.58 (3 % smaller, within the photo's measuring error) it runs
+# 25.9 cm and leaves a 31 degree gap.
+TEXT_SIZE = 0.58
 
 # Lid top layout, as fractions of the lid diameter from the top-left of the
 # lid seen from above (front edge at the bottom).
@@ -53,13 +59,29 @@ SET_GAP = 1.0
 # three stretches of the sentence to the fronts: 'For the first time in the
 # history of' | 'of aviation, IndiGo presents reus' | 'reusable cookie tins.
 # Enjoy'. Measured in Comfortaa: -13.78, +2.16 and +15.21 em from the middle
-# of the sentence, at TEXT_SIZE on the CIRC round.
-SET_TURNS = (105.6, -16.5, -116.6)
-# A single tin is shown the way the spread shows its first one: the sentence
-# starts near the left edge ('For the first time in the history of'). For a
-# camera at azimuth a the body turns by PHOTO_TURN - a, so every angle sees
-# that same stretch of the sentence.
-PHOTO_TURN = SET_TURNS[0]
+# of the sentence, at TEXT_SIZE on the body's round.
+SET_EM = (-13.78, 2.16, 15.21)
+SET_TURNS = tuple(-math.degrees(e * TEXT_SIZE / RB) for e in SET_EM)
+# Every shot turns the bodies by (turn - camera azimuth), and the lids by
+# -azimuth, so each camera sees the same stretch of the sentence and the lid
+# artwork squared to the lens, as a photographer would set a round tin.
+
+# A single tin: the sentence wraps 329 of the round's 360 degrees, so a tin
+# turned to show its start ('For', as on the spread's first tin) either
+# squeezes it against the left edge or shows the end ('Enjoy.') beside it. A
+# single tin is turned like the spread's middle one instead, so its front
+# reads 'history of aviation, IndiGo presents', centred between 'aviation,'
+# and 'IndiGo' and running on round both edges. Measured in the rasterized
+# strip: 'aviation,' spans -36 to -4 degrees from the sentence's middle and
+# 'IndiGo' -1 to +23.
+SINGLE_TURN = -6.0
+# The open tin: its lid hides the right half of the front, so the body turns
+# to end 'of aviation, IndiGo' just short of the lid's edge.
+OPEN_TURN = -24.0
+# The set keeps the spread's stretches, the first tin nudged so its 'For' is
+# not squeezed against its edge (its 'Enjoy.' stays round the back) and the
+# middle one less, so the sentence still reads on across the fronts.
+SET_NUDGE = (10.0, 4.0, 0.0)
 # Body shoulder under the lid curl: the wall rounds inwards to the neck with
 # this radius, leaving the dark crease under the curl seen in the photo.
 SHOULDER_R = 0.07
@@ -68,4 +90,4 @@ SHOULDER_R = 0.07
 # top outwards, leaning back on the tin's rim.
 OPEN_LID_BEARING = 9.0  # degrees from the front, towards +X
 OPEN_LID_LEAN = 24.0  # degrees back from vertical
-OPEN_LID_TURN = 14.0  # lid turned in its own plane so the flavour reads level to the hero camera
+OPEN_LID_TURN = 25.0  # lid turned in its own plane so the flavour reads about level to the open shot's camera

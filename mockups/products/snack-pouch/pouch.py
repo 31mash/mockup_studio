@@ -227,28 +227,34 @@ def panel_grid(side: int, seed: float = 0.0):
     rows, cols = P.shape[:2]
 
     # Film waviness. Common: both layers move together (the seals, the flat
-    # top). Outward: open film bows out a little, never into the contents.
+    # top), so it is a function of the point's place in space, the same for
+    # the front and the back panel. Outward: open film bows out a little,
+    # never into the contents, and not at all where the closed zip and the
+    # sealed header hold the two layers together.
     Q = P.copy()
+    zc = dims.Z_TOP - dims.ZIP
     for r in range(rows):
         z = zs[r]
         upper = np.clip((z - (dims.FILL - 0.4)) / 1.2, 0.0, 1.0)
+        stiff = float(np.clip((z - (zc - 0.8)) / 1.0, 0.0, 1.0))
+        lock = float(np.clip((zc - 0.2 - z) / 0.9, 0.0, 1.0))
         low = np.clip((z - 0.25) / 0.6, 0.0, 1.0)
         for c in range(cols):
             u = us[c]
+            x = P[r, c, 0]
             in_fin = u <= dims.SEAL or u >= dims.W - dims.SEAL
             edge = min(u, dims.W - u)
             tip = np.clip((edge - dims.SEAL) / 0.8, 0.0, 1.0)  # 0 at the seal, 1 inside
-            n1 = noise.noise(Vector((u * 0.55, z * 0.42, 3.1)))
-            n2 = noise.noise(Vector((u * 1.7, z * 1.3, 7.7)))
+            n1 = noise.noise(Vector((x * 0.55 + 3.4, z * 0.42, 3.1)))
+            n2 = noise.noise(Vector((x * 1.7 + 6.8, z * 1.3, 7.7)))
             common = (0.07 * n1 + 0.02 * n2) * (1.0 if in_fin else max(upper, 1 - tip)) * low
+            # The sealed header above the zip is stiffer: it stays nearly flat.
+            common *= 1.0 - 0.65 * stiff
             n3 = noise.noise(Vector((u * 0.8, z * 0.6, 11.3 + seed)))
             n4 = noise.noise(Vector((u * 2.3, z * 2.0, 17.9 + seed)))
             open_amp = (0.022 + 0.035 * upper) * tip * (0 if in_fin else 1)
             out = open_amp * (0.55 + 0.45 * n3 + 0.25 * n4)
-            out = max(out, 0.0)
-            # Keep the open top from pinching through the other layer.
-            if z > dims.Z_TOP - dims.TOP_SEAL:
-                out = 0.0
+            out = max(out, 0.0) * lock
             Q[r, c, 1] += common + side * out * low
     P = Q
 

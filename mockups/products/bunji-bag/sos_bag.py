@@ -166,8 +166,10 @@ def top_z(s: float, period: float) -> float:
     return H - dims.PINK_DEPTH * (1 - tri)
 
 
-def build_walls(name: str, mats: dict) -> bpy.types.Object:
-    """mats: front, plain, back, inside, edge (the cut edge)."""
+def build_walls(name: str, mats: dict, solid: bool = True) -> bpy.types.Object:
+    """mats: front, plain, back, inside, edge (the cut edge). With solid=False
+    the sheet stays a single surface: its materials then show the inside
+    themselves (on back faces) and can let light through, as thin kraft does."""
     cols, period = columns()
     zs = rows()
     bm = bmesh.new()
@@ -214,14 +216,15 @@ def build_walls(name: str, mats: dict) -> bpy.types.Object:
     for m in (mats['front'], mats['plain'], mats['back'], inside, inside, inside, edge, edge, edge):
         me.materials.append(m)
 
-    sol = ob.modifiers.new('paper', 'SOLIDIFY')
-    sol.thickness = dims.PAPER
-    sol.offset = -1.0  # grow inward: the modelled surface is the outside
-    sol.use_even_offset = True
-    sol.use_quality_normals = True
-    sol.use_rim = True
-    sol.material_offset = 3
-    sol.material_offset_rim = 6
+    if solid:
+        sol = ob.modifiers.new('paper', 'SOLIDIFY')
+        sol.thickness = dims.PAPER
+        sol.offset = -1.0  # grow inward: the modelled surface is the outside
+        sol.use_even_offset = True
+        sol.use_quality_normals = True
+        sol.use_rim = True
+        sol.material_offset = 3
+        sol.material_offset_rim = 6
     for o in bpy.context.view_layer.objects:
         o.select_set(False)
     ob.select_set(True)

@@ -27,13 +27,13 @@ DWALL = 0.09  # drawer walls are folded board, double thickness
 OUT = 4.0  # how far the drawer is pulled out beyond the sleeve's front end
 
 # ---------------------------------------------------------------- foil tray
-TRAY_GAP = 0.08  # between tray rim and drawer wall
-FLANGE = 0.34  # flat rim, outward from the top of the wall
+TRAY_GAP = 0.05  # between tray rim and drawer wall
+FLANGE = 0.5  # flat crimped rim, outward from the top of the wall
 BEAD = 0.07  # rolled edge radius
 TRAY_W = DW - 2 * DWALL - 2 * TRAY_GAP  # rim outline, outside of the bead
 TRAY_L = DL - 2 * DWALL - 2 * TRAY_GAP
 TRAY_H = 2.45  # floor to rim
-TRAY_DRAFT = 0.42  # wall slope: the floor is this much smaller on each side
+TRAY_DRAFT = 0.32  # wall slope: the floor is this much smaller on each side
 TRAY_R = 1.0  # plan corner radius at the rim (outside of the flange)
 
 # ---------------------------------------------------------------- mini dosai
@@ -41,9 +41,9 @@ TRAY_R = 1.0  # plan corner radius at the rim (outside of the flange)
 # rolled round its filling, flattened, with the ends tucked under. The photo's
 # front piece spans about 6.3 cm across the tray and runs back under the
 # sleeve's edge.
-PIECE_L = 5.95  # across the tray (x)
-PIECE_D = 3.5  # front to back (y)
-PIECE_H = 1.85  # height
+PIECE_L = 6.1  # across the tray (x)
+PIECE_D = 3.4  # front to back (y)
+PIECE_H = 1.5  # height
 PIECES = 3
 
 

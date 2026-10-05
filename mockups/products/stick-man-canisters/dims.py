@@ -31,7 +31,10 @@ FOIL_DOME = 0.018  # the membrane bulges a touch over the aperture
 TAB = (1.15, 0.85)  # folded pull tab, width x depth
 TAB_AT = 135.0  # tab direction, degrees from the front, positive to the right (back right)
 TAB_LIFT = 3.0  # the folded tab springs up from its fold, degrees
-FOIL_SILVER = '#d8d9dc'  # unprinted foil
+FOIL_SILVER = '#d8d9dc'  # unprinted foil, as drawn in the lid artwork
+FOIL_TINT = 0.7  # the bare foil's colour is the artwork's times this (linear)
+FOIL_METALLIC = 0.75  # lacquered foil: a satin metal, with some diffuse lacquer
+FOIL_ROUGH = 0.35
 LID_PLANE_W = 1.55  # print on the foil: the dotted plane over 'Stick Man'
 LID_PLANE_CY = -0.6  # plane centre, cm behind the lid centre
 LID_TITLE_SIZE = 0.62
@@ -71,9 +74,10 @@ def arc(deg):
 # --- Label layout, measured from the photo (all three cans share it) -------
 
 # The stick man, in cm around his torso centre (x right, y down). Six potato
-# sticks with rounded ends: head, torso, two arms and two legs splayed 31
+# sticks with softened corners: head, torso, two arms and two legs splayed 31
 # degrees from vertical, like the Chinese character for person, twice.
 STICK_W = 0.185
+STICK_ROUND = 0.22  # corner radius, in stick widths: cut sticks with softened corners
 STICK_COLOUR = '#f0a646'  # mustard orange
 FIG_D = 3.0  # torso centre depth
 FIGURE = {
@@ -115,15 +119,16 @@ NUTRI_SIZE = 0.15
 NUTRI_LEAD = 0.25
 
 # Per can: label colours and where things sit round it (degrees from front).
+# The paper colours render at the photo's colours on the matte label paper.
 CANS = {
     'brown': dict(
-        paper='#5a3f2e', title='#a6d6ef', sub='#d4e7ee', poem='#a4c841', small='#eadccf', plane='#d9e9f0',
+        paper='#553a2a', title='#a6d6ef', sub='#d4e7ee', poem='#a4c841', small='#eadccf', plane='#d9e9f0',
         flavour='Tomato', panel=-70.7, ingr=(-70.7, 0), nutri=156.0,
         figures=[(34.4 + 42.0 * k, FULL) for k in range(6)],
         crumbs=[],
     ),
     'pink': dict(
-        paper='#e2416e', title='#ffffff', sub='#ffffff', poem='#ffd68a', small='#fde7ee', plane='#ffffff',
+        paper='#e03e68', title='#ffffff', sub='#ffffff', poem='#ffd68a', small='#fde7ee', plane='#ffffff',
         flavour='Masala', panel=172.0, ingr=(172.0, 0), nutri=112.0,
         figures=[
             (-83.5, FULL),
@@ -136,7 +141,7 @@ CANS = {
         crumbs=[],
     ),
     'navy': dict(
-        paper='#3c3b5c', title='#a2c940', sub='#a2c940', poem='#95cbe8', small='#dedde8', plane='#dfe9ef',
+        paper='#3a3a55', title='#a2c940', sub='#a2c940', poem='#95cbe8', small='#dedde8', plane='#dfe9ef',
         flavour='Salted', panel=72.0, ingr=(72.0, 0), nutri=-16.3,
         figures=[
             (-141.2, ('head', 'torso', 'legR')),
@@ -147,6 +152,11 @@ CANS = {
         crumbs=[4.2],
     ),
 }
+
+# Label angle (degrees from the photo's front, + to the right) each can turns
+# to the camera in its own hero shot: the title panel to the left of centre
+# and the first stick man coming round on the right.
+HERO_AT = {'brown': -15.0, 'pink': -130.0, 'navy': 108.0}
 
 # Set: three cans in a row, as in the spread (centres 8.5 cm apart).
 SET_STEP = 8.5

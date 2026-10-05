@@ -129,12 +129,12 @@ def rings():
         r = (1 - bulge) * tri + bulge
         r = r * scale[near]
         # Round the folds (more so higher up), keep the seam and the feet crisper.
-        soft = _gauss_smooth(r, 2.6 + 5.0 * min(1.0, h * 2.0))
+        soft = _gauss_smooth(r, 2.0 + 3.6 * min(1.0, h * 2.0))
         sharp = _gauss_smooth(r, 1.8 + 2.0 * h)
         wsharp = np.where(seam, 1.0, 0.0) * np.exp(-(dmin / 26.0) ** 2)
         r = soft * (1 - wsharp) + sharp * wsharp
         # Profile to the tip: nearly straight faces, a little fuller low down.
-        prof = (1 - h) ** 0.9 * (1 + 0.1 * math.sin(math.pi * h ** 0.8))
+        prof = (1 - h) ** 0.85 * (1 + 0.16 * math.sin(math.pi * h ** 0.75))
         rr = R0 * r * prof
         # Base: a tight roll under the edge, a thin lip, and flat feet at the corners.
         rb = 0.35
@@ -177,7 +177,7 @@ def surface():
     z = flat[:, 2]
     # Fade the relief out at the very base (it sits flat) and near the tip.
     fade = np.clip(z / 0.12, 0, 1) * np.clip((H - z) / 0.5, 0, 1)
-    lumps = (0.08 * _lumps(flat) + 0.03 * _small(flat)) * np.clip(z / 0.5, 0, 1) * np.clip((H - z) / 0.8, 0, 1)
+    lumps = (0.12 * _lumps(flat) + 0.035 * _small(flat)) * np.clip(z / 0.5, 0, 1) * np.clip((H - z) / 0.8, 0, 1)
     # Blisters are denser where the dough was thinner (patches), sparse on the folds.
     dense = np.clip(0.55 + 0.9 * _patch(flat), 0.15, 1.0)
     b = np.maximum.reduce([
@@ -240,12 +240,14 @@ def mesh(name, mat, at=(0.0, 0.0, 0.0)):
 
 
 def material(m):
-    """Deep-fried pastry: golden brown with broad darker patches; blister tops
-    paler, folds, seam and base fried darker; a few carom seeds; an oily coat
-    that glints on the blisters."""
+    """Deep-fried pastry, as in the photo: golden tan with paler, less-fried
+    dough where the filling pushes the faces out and deeper caramel towards
+    the folds, the seam and the base; a dense, clustered field of tiny pale
+    blisters with darker pores between them; a few carom seeds; a thin oily
+    sheen."""
     from studio.core import rgba
 
-    mat = m.solid('samosa', '#a8652c', roughness=0.5)
+    mat = m.solid('samosa', '#bf8642', roughness=0.55)
     nt = mat.node_tree
     N, Lk = nt.nodes, nt.links
     p = N['Principled BSDF']
@@ -284,89 +286,107 @@ def material(m):
                 Lk.new(v, n.inputs[sock])
         return n.outputs['Result']
 
-    def noise(scale, detail=4.0, rough=0.55):
+    def noise(scale, detail=4.0, rough=0.55, vec=None):
         n = N.new('ShaderNodeTexNoise')
         n.inputs['Scale'].default_value = scale
         n.inputs['Detail'].default_value = detail
         n.inputs['Roughness'].default_value = rough
-        Lk.new(obj, n.inputs['Vector'])
+        Lk.new(vec or obj, n.inputs['Vector'])
         return n.outputs['Fac']
 
-    def ramp01(x, lo, hi):  # (x - lo) / (hi - lo), clamped
-        return op('MULTIPLY', op('SUBTRACT', x, lo), 1.0 / (hi - lo), clamp=True)
+    def ramp01(x, lo, hi):  # smoothstep(lo, hi, x)
+        t = op('MULTIPLY', op('SUBTRACT', x, lo), 1.0 / (hi - lo), clamp=True)
+        return op('MULTIPLY', op('MULTIPLY', t, t), op('SUBTRACT', 3.0, op('MULTIPLY', t, 2.0)))
 
     bl = attr('blister')
     edge = attr('edge')
+    inner = op('SUBTRACT', 1.0, op('POWER', edge, 0.8))  # 1 mid-face, 0 on folds and base
 
-    # Colour: golden brown, broad deeper patches and a finer mottle.
-    col = mix(ramp01(noise(0.45, 3.0), 0.35, 0.65), '#b66a24', '#96521d')
-    col = mix(op('MULTIPLY', ramp01(noise(2.2, 4.0), 0.5, 0.7), 0.45), col, '#83431a')
-    # Soft pale patches, where the dough fried lighter.
-    col = mix(op('MULTIPLY', ramp01(noise(0.32, 2.0), 0.52, 0.72), 0.55), col, '#cd9751')
-    # Folds, the seam, the tip and the base fry darker.
-    col = mix(op('MULTIPLY', op('POWER', edge, 1.3), 0.75), col, '#6c3411')
-    # Blister tops fry paler and golden.
-    col = mix(op('MULTIPLY', bl, 0.4), col, '#c78e48')
-    col = mix(op('MULTIPLY', ramp01(noise(9.0, 3.0), 0.45, 0.7), 0.3), col, '#86461a')
-    # Bubbles all over: small pale specks, and finer ones (also in the bump below).
-    def specks(scale, r0, r1, keep):
-        v = N.new('ShaderNodeTexVoronoi')
-        v.inputs['Scale'].default_value = scale
-        Lk.new(warped.outputs['Vector'], v.inputs['Vector'])
-        pick = N.new('ShaderNodeSeparateColor')
-        Lk.new(v.outputs['Color'], pick.inputs['Color'])
-        size = op('ADD', r0, op('MULTIPLY', pick.outputs[0], r1 - r0))
-        dome = op('SUBTRACT', 1.0, op('DIVIDE', v.outputs['Distance'], size), clamp=True)
-        dome = op('MULTIPLY', dome, op('GREATER_THAN', pick.outputs[1], 1.0 - keep))
-        return op('MULTIPLY', op('POWER', dome, 0.5), op('SUBTRACT', 1.0, op('MULTIPLY', edge, 0.6)))
-
+    # Coordinates warped a little, so nothing looks like a regular lattice.
     wob = N.new('ShaderNodeTexNoise')
-    wob.inputs['Scale'].default_value = 6.0
-    wob.inputs['Detail'].default_value = 2.0
+    wob.inputs['Scale'].default_value = 3.0
+    wob.inputs['Detail'].default_value = 3.0
     Lk.new(obj, wob.inputs['Vector'])
     wv = N.new('ShaderNodeVectorMath')
     wv.operation = 'SCALE'
-    wv.inputs['Scale'].default_value = 0.05
+    wv.inputs['Scale'].default_value = 0.12
     Lk.new(wob.outputs['Color'], wv.inputs[0])
     warped = N.new('ShaderNodeVectorMath')
     warped.operation = 'ADD'
     Lk.new(obj, warped.inputs[0])
     Lk.new(wv.outputs['Vector'], warped.inputs[1])
-    speck = op('MAXIMUM', specks(3.6, 0.14, 0.34, 0.6), op('MULTIPLY', specks(8.0, 0.18, 0.4, 0.5), 0.7))
-    col = mix(op('MULTIPLY', speck, 0.7), col, '#dcb06c')
+    W = warped.outputs['Vector']
+
+    # Colour: golden tan in broad, soft zones.
+    col = mix(ramp01(noise(0.42, 3.0, vec=W), 0.38, 0.64), '#b2702c', '#c68a3e')
+    # Paler dough where the faces bulge and fried less.
+    pale = op('MULTIPLY', ramp01(noise(0.6, 4.0, 0.6, vec=W), 0.5, 0.72), inner)
+    col = mix(op('MULTIPLY', pale, 0.6), col, '#d6ac64')
+    # Deeper caramel patches.
+    col = mix(op('MULTIPLY', ramp01(noise(1.3, 4.0, vec=W), 0.54, 0.76), 0.6), col, '#935220')
+    # Folds, the seam, the tip and the base fry darker.
+    col = mix(op('MULTIPLY', op('POWER', edge, 1.3), 0.78), col, '#743d14')
+    col = mix(op('MULTIPLY', bl, 0.3), col, '#d3a865')
+
+    # Blisters: tiny irregular bubbles of paler, crisp dough, clustered.
+    def bubbles(scale, r0, r1, keep):
+        v = N.new('ShaderNodeTexVoronoi')
+        v.inputs['Scale'].default_value = scale
+        v.inputs['Randomness'].default_value = 1.0
+        Lk.new(W, v.inputs['Vector'])
+        pick = N.new('ShaderNodeSeparateColor')
+        Lk.new(v.outputs['Color'], pick.inputs['Color'])
+        size = op('ADD', r0, op('MULTIPLY', pick.outputs[0], r1 - r0))
+        dome = op('SUBTRACT', 1.0, op('DIVIDE', v.outputs['Distance'], size), clamp=True)
+        return op('MULTIPLY', op('POWER', dome, 0.6), op('GREATER_THAN', pick.outputs[1], 1.0 - keep))
+
+    cluster = ramp01(noise(1.7, 3.0, vec=W), 0.36, 0.62)
+    fine = op('MAXIMUM', bubbles(13.0, 0.22, 0.42, 0.75), op('MULTIPLY', bubbles(26.0, 0.25, 0.45, 0.7), 0.8))
+    fine = op('MULTIPLY', fine, op('ADD', 0.25, op('MULTIPLY', cluster, 0.75)))
+    mid = op('MULTIPLY', bubbles(7.0, 0.25, 0.48, 0.6), op('ADD', 0.35, op('MULTIPLY', cluster, 0.65)))
+    big = op('MULTIPLY', bubbles(4.0, 0.14, 0.32, 0.35), inner)
+    blis = op('MAXIMUM', op('MAXIMUM', fine, op('MULTIPLY', mid, 0.85)), big)
+    col = mix(op('MULTIPLY', blis, 0.5), col, '#e0bd7a')
+    # Pores between the bubbles: small darker pits.
+    pores = N.new('ShaderNodeTexVoronoi')
+    pores.inputs['Scale'].default_value = 34.0
+    Lk.new(W, pores.inputs['Vector'])
+    pk = N.new('ShaderNodeSeparateColor')
+    Lk.new(pores.outputs['Color'], pk.inputs['Color'])
+    pit = op('MULTIPLY', op('LESS_THAN', pores.outputs['Distance'], 0.16), op('GREATER_THAN', pk.outputs[2], 0.78))
+    col = mix(op('MULTIPLY', pit, 0.45), col, '#7a4519')
     # A few carom seeds.
     seeds = N.new('ShaderNodeTexVoronoi')
-    seeds.inputs['Scale'].default_value = 2.6
-    Lk.new(obj, seeds.inputs['Vector'])
-    sd = op('LESS_THAN', seeds.outputs['Distance'], 0.045)
+    seeds.inputs['Scale'].default_value = 2.4
+    Lk.new(W, seeds.inputs['Vector'])
+    sd = op('LESS_THAN', seeds.outputs['Distance'], 0.04)
     which = N.new('ShaderNodeSeparateColor')
     Lk.new(seeds.outputs['Color'], which.inputs['Color'])
-    sd = op('MULTIPLY', sd, op('GREATER_THAN', which.outputs[2], 0.72))
-    col = mix(op('MULTIPLY', sd, 0.85), col, '#3a2210')
+    sd = op('MULTIPLY', sd, op('GREATER_THAN', which.outputs[2], 0.7))
+    col = mix(op('MULTIPLY', sd, 0.8), col, '#3e2511')
     Lk.new(col, p.inputs['Base Color'])
 
-    # Fine texture on top of the geometric blisters: pinprick bubbles and grain.
-    micro = N.new('ShaderNodeTexVoronoi')
-    micro.inputs['Scale'].default_value = 22.0
-    Lk.new(obj, micro.inputs['Vector'])
-    pin = op('SUBTRACT', 1.0, ramp01(micro.outputs['Distance'], 0.0, 0.42))
-    height = op('ADD', op('ADD', op('MULTIPLY', op('POWER', pin, 2.0), 0.3), op('MULTIPLY', noise(45.0, 6.0, 0.6), 0.3)),
-                speck)
+    # Relief on top of the geometric blisters: the bubbles stand proud, the
+    # pores sink, and a fine crumb texture over everything.
+    height = op('ADD', op('MULTIPLY', op('MAXIMUM', blis, mid), 0.6), op('MULTIPLY', noise(48.0, 6.0, 0.65), 0.3))
+    height = op('ADD', height, op('MULTIPLY', noise(9.0, 4.0), 0.3))
+    height = op('SUBTRACT', height, op('MULTIPLY', pit, 0.3))
     bump = N.new('ShaderNodeBump')
-    bump.inputs['Strength'].default_value = 0.5
-    bump.inputs['Distance'].default_value = 0.012
+    bump.inputs['Strength'].default_value = 1.0
+    bump.inputs['Distance'].default_value = 0.03
     Lk.new(height, bump.inputs['Height'])
     Lk.new(bump.outputs['Normal'], p.inputs['Normal'])
     Lk.new(bump.outputs['Normal'], p.inputs['Coat Normal'])
 
-    # Oil: blister tops and glossy patches are slicker.
-    rough = op('SUBTRACT', op('ADD', 0.5, op('MULTIPLY', noise(1.3, 3.0), 0.2)), op('MULTIPLY', bl, 0.18))
+    # A thin film of oil: slicker on the bubbles, drier in the pores.
+    rough = op('ADD', 0.5, op('MULTIPLY', noise(1.3, 3.0), 0.16))
+    rough = op('SUBTRACT', rough, op('MULTIPLY', blis, 0.12))
     Lk.new(rough, p.inputs['Roughness'])
-    p.inputs['Specular IOR Level'].default_value = 0.4
-    p.inputs['Coat Weight'].default_value = 0.16
-    p.inputs['Coat Roughness'].default_value = 0.22
+    p.inputs['Specular IOR Level'].default_value = 0.42
+    p.inputs['Coat Weight'].default_value = 0.14
+    p.inputs['Coat Roughness'].default_value = 0.28
     p.inputs['Coat IOR'].default_value = 1.47
-    p.inputs['Subsurface Weight'].default_value = 0.06
-    p.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.2)
-    p.inputs['Subsurface Scale'].default_value = 0.1
+    p.inputs['Subsurface Weight'].default_value = 0.08
+    p.inputs['Subsurface Radius'].default_value = (1.0, 0.5, 0.22)
+    p.inputs['Subsurface Scale'].default_value = 0.12
     return mat

@@ -217,3 +217,30 @@ def sheet(m, name: str, art: str | None = None, seals: str | None = None, seal_v
     else:
         g.L.new(s, out.inputs['Surface'])
     return mat
+
+
+def milky(m, name: str, veil: float = 0.4, colour: float = 0.92, rim: float = 0.45):
+    """Half-clear milky polyethylene for thin parts (the zip profiles, the
+    film's cut edge), built like the sheet: transparent plus an emitted
+    veil and the studio's reflection, so it renders clean at any sample
+    count. The veil thickens towards the silhouette, where the eye looks
+    through more plastic, which rounds the profiles."""
+    mat = m.solid(name, '#ffffff')
+    mat.cycles.emission_sampling = 'NONE'
+    nt = mat.node_tree
+    g = _G(nt)
+    p = nt.nodes['Principled BSDF']
+    out = nt.nodes['Material Output']
+    nt.nodes.remove(p)
+    lw = nt.nodes.new('ShaderNodeLayerWeight')
+    lw.inputs['Blend'].default_value = 0.5
+    edge = g.m('POWER', lw.outputs['Facing'], 2.0)
+    fac = g.m('MINIMUM', g.m('ADD', veil, g.m('MULTIPLY', edge, rim)), 0.95)
+    s = g.mix_shader(fac, nt.nodes.new('ShaderNodeBsdfTransparent').outputs[0],
+                     g.emission((colour, colour, colour * 1.01, 1.0)))
+    fres, refl = reflection(g)
+    s = g.mix_shader(g.m('MULTIPLY', fres, 0.6), s, g.emission(refl))
+    lp = nt.nodes.new('ShaderNodeLightPath')
+    s = g.mix_shader(lp.outputs['Is Camera Ray'], nt.nodes.new('ShaderNodeBsdfTransparent').outputs[0], s)
+    g.L.new(s, out.inputs['Surface'])
+    return mat

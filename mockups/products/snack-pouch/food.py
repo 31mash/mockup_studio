@@ -25,15 +25,17 @@ import pouch
 
 def stick_mesh(name: str, L: float, r: float, bend: float, seed: int):
     """A stick along local X, chord from -L/2 to L/2, bowed towards +Y by
-    `bend`, with a knobbly, faintly ridged surface and blunt broken ends."""
+    `bend`. Extruded and fried dough: a few soft ridges from the die running
+    along it (twisting a little), crinkled into small bulges every few
+    millimetres, gently kinked, with blunt broken ends."""
     import bpy
     from mathutils import Vector, noise
 
     rng = np.random.default_rng(seed)
-    ring_n = 14
+    ring_n = 20
     cap = 0.45 * r
     body = L - 2 * cap
-    n_body = max(6, int(body / 0.06))
+    n_body = max(10, int(body / 0.035))
     xs = list(np.linspace(-body / 2, body / 2, n_body + 1))
     # End caps: blunt, slightly irregular breaks.
     cap_steps = [(0.12, 0.97), (0.25, 0.88), (0.35, 0.68), (0.41, 0.34)]
@@ -45,28 +47,38 @@ def stick_mesh(name: str, L: float, r: float, bend: float, seed: int):
     for dx, s in cap_steps:
         rings.append((body / 2 + dx * r, s, 1.0))
     off = Vector((rng.uniform(0, 50), rng.uniform(0, 50), rng.uniform(0, 50)))
-    twist = rng.uniform(-3, 3)
-    flat = rng.uniform(0.84, 0.96)
+    ridges = int(rng.integers(6, 9))
+    ridge_amp = float(rng.uniform(0.03, 0.055))
+    twist = float(rng.uniform(-1.4, 1.4))  # radians per cm
+    crinkle = float(rng.uniform(0.085, 0.13))
+    flat = float(rng.uniform(0.86, 0.97))
+
+    def centre(x):
+        cy = bend * (1 - (2 * x / L) ** 2) - bend / 2
+        cy += 0.04 * noise.noise(Vector((x * 0.8, 1.7, seed * 0.37)))
+        cz = 0.035 * noise.noise(Vector((x * 0.8, 6.1, seed * 0.53)))
+        return cy, cz
+
     verts = []
     for x, s, rough in rings:
-        cy = bend * (1 - (2 * x / L) ** 2) - bend / 2
-        cy += 0.025 * math.sin(x * 2.1 + seed)
-        taper = 1.0 + 0.08 * noise.noise(Vector((x * 1.1, 0.3, seed * 1.7))) + 0.04 * noise.noise(Vector((x * 3.0, 0.7, seed * 2.9)))
+        cy, cz = centre(x)
+        taper = 1.0 + 0.07 * noise.noise(Vector((x * 1.1, 0.3, seed * 1.7))) + 0.04 * noise.noise(Vector((x * 3.0, 0.7, seed * 2.9)))
         for j in range(ring_n):
             t = 2 * math.pi * j / ring_n
             ct, st = math.cos(t), math.sin(t)
-            p = Vector((x * 4.0, ct * 1.3, st * 1.3)) + off
-            k = 1.0 + 0.04 * math.cos(7 * t + twist * x) + 0.1 * noise.noise(p) + 0.07 * noise.noise(p * 2.6) + 0.035 * noise.noise(p * 6.0)
+            p = Vector((x * 3.3, ct * 0.85, st * 0.85)) + off
+            k = 1.0 + ridge_amp * s * math.cos(ridges * t + twist * x)
+            k += crinkle * noise.noise(p) + 0.05 * noise.noise(p * 2.4) + 0.025 * noise.noise(p * 6.0)
             k += rough * 0.2 * noise.noise(p * 1.9 + Vector((4, 4, 4)))
             rad = r * s * taper * k
-            verts.append((x, cy + rad * ct, rad * st * flat))
+            verts.append((x, cy + rad * ct, cz + rad * st * flat))
     # Tip vertices close the ends.
     x0 = rings[0][0] - 0.04 * r
     x1 = rings[-1][0] + 0.04 * r
-    c0 = bend * (1 - (2 * x0 / L) ** 2) - bend / 2
-    c1 = bend * (1 - (2 * x1 / L) ** 2) - bend / 2
-    verts.append((x0, c0, 0.0))
-    verts.append((x1, c1, 0.0))
+    c0 = centre(x0)
+    c1 = centre(x1)
+    verts.append((x0, c0[0], c0[1]))
+    verts.append((x1, c1[0], c1[1]))
     nr = len(rings)
     faces = []
     for i in range(nr - 1):
@@ -96,8 +108,9 @@ def crumb_mesh(name: str, r: float, seed: int):
     off = Vector((seed * 3.3, seed * 1.1, seed * 7.7))
     for v in bm.verts:
         d = v.co.normalized()
-        v.co = d * r * (1 + 0.35 * noise.noise(d * 1.6 + off))
-        v.co.z *= 0.6
+        v.co = d * r * (1 + 0.45 * noise.noise(d * 1.6 + off) + 0.15 * noise.noise(d * 4.0 + off))
+        v.co.x *= 1.25
+        v.co.z *= 0.55
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -166,7 +179,13 @@ class Packer:
 
 
 CLEAR = 0.05  # gap between a stick and the film
-CORE_INSET = 1.6  # the hidden core sits this far in from the film
+LONG = 0.5 * (dims.STICK_L[0] + dims.STICK_L_SHORT[1])  # whole sticks are longer than this
+
+
+def _reff(r, bend):
+    """Radius of the capsule that holds a stick: its crinkles, kinks and bow."""
+    return r * 1.12 + bend * 0.5 + 0.02
+CORE_INSET = 1.95  # the hidden core sits this far in from the film
 
 
 def _unit(v):
@@ -208,7 +227,7 @@ def _pair_closest(A0, A1):
     return pi, pj, np.linalg.norm(pi - pj, axis=-1)
 
 
-def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03):
+def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03, align=0.55):
     """A dense single layer of sticks against one panel. The stick axes lie
     on the film set in by about a stick radius; on that surface, unrolled
     (s = arc length across, z = height), sticks are scattered, pushed apart
@@ -234,7 +253,7 @@ def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03):
     # As many sticks as cover `cover` of the layer (the rest stays gaps).
     area = float(np.sum(2 * half * (zt < dims.FILL)) * (zt[1] - zt[0]))
     idx = rng.choice(pool, 400)
-    reff = P[idx, 1] * 1.1 + P[idx, 2] * 0.5
+    reff = _reff(P[idx, 1], P[idx, 2])
     n = int(np.searchsorted(np.cumsum(2 * reff * P[idx, 0]), cover * area))
     idx, reff = idx[:n], reff[:n]
     L = P[idx, 0]
@@ -242,7 +261,7 @@ def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03):
     c = np.stack([np.zeros(n), rng.uniform(z_lo, dims.FILL, n)], 1)
     c[:, 0] = rng.uniform(-1, 1, n) * np.interp(c[:, 1], zt, half)
     field = 1.57 + 1.1 * np.sin(0.5 * c[:, 0] + 0.33 * c[:, 1] + 1.0 + side) + 0.7 * np.sin(0.8 * c[:, 1] - 0.4 * c[:, 0] + 2.3)
-    th = np.where(rng.random(n) < 0.55, field + rng.normal(0, 0.35, n), rng.uniform(0, math.pi, n))
+    th = np.where(rng.random(n) < align, field + rng.normal(0, 0.35, n), rng.uniform(0, math.pi, n))
     eye = np.eye(n, dtype=bool)
     for it in range(iters):
         dv = np.stack([np.cos(th), np.sin(th)], 1)
@@ -276,6 +295,7 @@ def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03):
     dv = np.stack([np.cos(th), np.sin(th)], 1)
     _, _, dist = _pair_closest(c - dv * h[:, None], c + dv * h[:, None])
     over = np.where(eye, 0.0, np.maximum(0.0, reff[:, None] + reff[None, :] - dist)).sum(1)
+    _dbg('  relax', it, n, float(over.max()), int((over > 0.01).sum()))
     order = np.argsort(over)
     idx, c, th, reff, h = idx[order], c[order], th[order], reff[order], h[order]
 
@@ -296,9 +316,15 @@ def relax_layer(rng, P, pool, cover, side, deeper=0.0, iters=700, gap=0.03):
     inward = -nrm
     w = _unit(np.cross(inward, d)) * rng.choice([-1.0, 1.0], (m, 1))
     base = mid + inward * (reff - np.mean(reff))[:, None]
-    steps = np.arange(12) * 0.02
+    steps = np.arange(20) * 0.03
     centres = base[:, None, :] + inward[:, None, :] * steps[None, :, None]
     return idx, centres, d, w
+
+
+def _dbg(*a):
+    import os
+    if os.environ.get('PACK_DEBUG'):
+        print('[pack]', *a)
 
 
 def pack(protos, seed: int = 11):
@@ -306,24 +332,34 @@ def pack(protos, seed: int = 11):
     rng = np.random.default_rng(seed)
     pk = Packer()
     P = np.array(protos)  # L, r, bend
-    long_ = np.nonzero(P[:, 0] >= 1.9)[0]
-    short = np.nonzero(P[:, 0] < 1.9)[0]
+    long_ = np.nonzero(P[:, 0] >= LONG)[0]
+    short = np.nonzero(P[:, 0] < LONG)[0]
 
     def place(pi, centres, d, w):
         L, r, bend = P[pi, 0], P[pi, 1], P[pi, 2]
-        reff = r * 1.1 + bend * 0.5
+        reff = _reff(r, bend)
         hl = L / 2 - 0.4 * r
         k = _first_fit(centres, d, hl, reff)
         t = np.linspace(-1, 1, 7)
+        stats = [int((k < 0).sum()), 0, 0]
+        K = centres.shape[1]
         for i in np.nonzero(k >= 0)[0]:
-            c = centres[i, k[i]]
             h = max(0.01, L[i] / 2 - r[i])
-            a, b = c - d[i] * h, c + d[i] * h
-            axis = c + np.outer(t * L[i] / 2, d[i])
-            if pouch.core_hits(axis, reff[i] + 0.01, CORE_INSET, CORE_INSET + 0.05).any():
-                continue
-            if pk.free(a, b, reff[i]):
-                pk.add(a, b, reff[i], (int(pi[i]), c.copy(), d[i].copy(), w[i].copy()))
+            # From the first push that fits the film, further in until the
+            # stick clears the others: it then lies across them, behind.
+            for j in range(k[i], K):
+                c = centres[i, j]
+                a, b = c - d[i] * h, c + d[i] * h
+                axis = c + np.outer(t * L[i] / 2, d[i])
+                if pouch.core_hits(axis, reff[i] + 0.01, CORE_INSET, CORE_INSET + 0.05).any():
+                    stats[1] += 1
+                    break
+                if pk.free(a, b, reff[i]):
+                    pk.add(a, b, reff[i], (int(pi[i]), c.copy(), d[i].copy(), w[i].copy()))
+                    break
+            else:
+                stats[2] += 1
+        _dbg('  no fit / core / taken', stats)
 
     def wall(side, n, depth_range, pool, pushes=12):
         xi = rng.uniform(-0.96, 0.96, n)
@@ -339,7 +375,7 @@ def pack(protos, seed: int = 11):
         phi = np.where(rng.random(m) < 0.7, field + rng.normal(0, 0.3, m), rng.uniform(0, math.pi, m))[:, None]
         d = _unit(np.cos(phi) * tx + np.sin(phi) * tz + nrm * rng.uniform(-0.1, 0.1, (m, 1)))
         w = _unit(np.cross(nrm, d)) * rng.choice([-1.0, 1.0], (m, 1))
-        reff = P[pi, 1] * 1.1 + P[pi, 2] * 0.5
+        reff = _reff(P[pi, 1], P[pi, 2])
         base = p - nrm * (reff + CLEAR + 0.01 + rng.uniform(*depth_range, m))[:, None]
         steps = np.arange(pushes) * 0.05
         centres = base[:, None, :] - nrm[:, None, :] * steps[None, :, None]
@@ -355,7 +391,7 @@ def pack(protos, seed: int = 11):
         d = _unit(np.stack([np.cos(ang), np.sin(ang) * 0.6, rng.uniform(-0.3, 0.3, n)], axis=1))
         w = _unit(np.cross(d, [0.0, 0.0, 1.0]))
         pi = rng.choice(pool, n)
-        reff = P[pi, 1] * 1.1 + P[pi, 2] * 0.5
+        reff = _reff(P[pi, 1], P[pi, 2])
         base = np.stack([x, y, pouch.fill_top(x) - reff - rng.uniform(0.02, 0.3, n)], axis=1)
         steps = np.arange(14) * 0.05
         centres = base[:, None, :] - np.array([0, 0, 1.0])[None, None, :] * steps[None, :, None]
@@ -383,7 +419,7 @@ def pack(protos, seed: int = 11):
         d = _unit(np.stack([np.cos(ang), np.sin(ang), rng.uniform(-0.12, 0.12, n)], axis=1))
         w = _unit(np.cross(d, [0.0, 0.0, 1.0]))
         pi = rng.choice(pool, n)
-        reff = P[pi, 1] * 1.1 + P[pi, 2] * 0.5
+        reff = _reff(P[pi, 1], P[pi, 2])
         base = np.stack([x, y, 0.2 + reff + CLEAR + rng.uniform(0.0, 0.05, n)], axis=1)
         steps = np.arange(8) * 0.05
         centres = base[:, None, :] + np.array([0, 0, 1.0])[None, None, :] * steps[None, :, None]
@@ -393,22 +429,32 @@ def pack(protos, seed: int = 11):
     # stick's width further in.
     mix = np.concatenate([long_, long_, long_, short])
     for side in (-1, +1):
-        pi, centres, d, w = relax_layer(rng, P, mix, 0.7, side)
+        pi, centres, d, w = relax_layer(rng, P, mix, 0.68, side, iters=1500, align=0.7)
         place(pi, centres, d, w)
+        _dbg('layer1', len(pi), pk.n)
     top(2500, long_)
+    _dbg('top', 0, pk.n)
     floor(1500, np.arange(len(P)))
+    _dbg('floor', 0, pk.n)
     for side in (-1, +1):
-        pi, centres, d, w = relax_layer(rng, P, mix, 0.62, side, deeper=0.85)
+        pi, centres, d, w = relax_layer(rng, P, mix, 0.62, side, deeper=0.5, iters=1500, align=0.7)
         place(pi, centres, d, w)
-    # Broken pieces in what gaps are left, then the middle.
+        _dbg('layer2', len(pi), pk.n)
+    # Whole sticks in the gaps of those layers, lying across them behind;
+    # broken pieces in what gaps are left, then the middle.
+    wall(-1, 4000, (0.0, 0.5), long_, pushes=16)
+    wall(+1, 2500, (0.0, 0.5), long_, pushes=16)
+    _dbg('wall long', 0, pk.n)
     wall(-1, 5000, (0.0, 0.03), short)
     wall(+1, 3000, (0.0, 0.03), short)
+    _dbg('wall', 0, pk.n)
     top(1500, short)
     middle(2500, np.arange(len(P)))
+    _dbg('middle', 0, pk.n)
     return pk.items, pk
 
 
-def crumbs(rng, pk, n=40):
+def crumbs(rng, pk, n=26):
     """Small broken bits at the bottom, in the gaps against the film."""
     out = []
     for _ in range(n * 25):
@@ -419,9 +465,9 @@ def crumbs(rng, pk, n=40):
         side = -1 if rng.random() < 0.7 else 1
         p, nrm, tx, tz = (v[0] for v in pouch.surface_frames(side, np.array([xi]), np.array([z])))
         r = rng.uniform(0.05, 0.13)
-        c = p - nrm * (1.35 * r + CLEAR + 0.02)
-        if pouch.inside(c[None], 1.35 * r + CLEAR)[0] and pk.free(c - 0.001, c + 0.001, 1.35 * r):
-            pk.add(c - 0.001, c + 0.001, 1.35 * r, None)
+        c = p - nrm * (1.6 * r + CLEAR + 0.02)
+        if pouch.inside(c[None], 1.6 * r + CLEAR)[0] and pk.free(c - 0.001, c + 0.001, 1.6 * r):
+            pk.add(c - 0.001, c + 0.001, 1.6 * r, None)
             out.append((c, r, rng.uniform(0, 2 * math.pi)))
     return out
 
@@ -462,31 +508,37 @@ def fried(m, name: str = 'namkeen', dark: float = 1.0):
     L.new(rnd.outputs[0], vec.inputs[1])
     V = vec.outputs[0]
 
-    # Base colour: golden to orange-brown patches.
+    # Base colour: golden to orange patches (sampled from the photo, a
+    # little richer, since the film's sheen lifts and greys them).
     n1 = _n(nt, 'ShaderNodeTexNoise', Scale=2.2, Detail=4.0, Roughness=0.55)
     L.new(V, n1.inputs['Vector'])
     ramp = nt.nodes.new('ShaderNodeValToRGB')
     cr = ramp.color_ramp
     cr.elements[0].position = 0.3
-    cr.elements[0].color = rgba('#cc9346')
+    cr.elements[0].color = rgba('#d8a452')
     cr.elements[1].position = 0.72
-    cr.elements[1].color = rgba('#efca7f')
+    cr.elements[1].color = rgba('#f8da92')
     mid = cr.elements.new(0.52)
-    mid.color = rgba('#dfae5e')
+    mid.color = rgba('#ecbd68')
     L.new(n1.outputs['Fac'], ramp.inputs['Fac'])
     col = ramp.outputs['Color']
 
-    # Some sticks fried a shade darker.
+    # Each stick fried a little differently: from pale gold to deep orange-brown.
+    tone_r = nt.nodes.new('ShaderNodeValToRGB')
+    tr = tone_r.color_ramp
+    tr.elements[0].position = 0.0
+    tr.elements[0].color = (1.0, 1.0, 1.0, 1.0)
+    tr.elements[1].position = 1.0
+    tr.elements[1].color = rgba('#e6bc94')
+    pale = tr.elements.new(0.18)
+    pale.color = rgba('#fff4dc')
+    L.new(info.outputs['Random'], tone_r.inputs['Fac'])
     mixd = nt.nodes.new('ShaderNodeMix')
     mixd.data_type = 'RGBA'
-    mixd.blend_type = 'MIX'
-    shade = nt.nodes.new('ShaderNodeMath')
-    shade.operation = 'MULTIPLY'
-    L.new(info.outputs['Random'], shade.inputs[0])
-    shade.inputs[1].default_value = 0.6
-    L.new(shade.outputs[0], mixd.inputs['Factor'])
+    mixd.blend_type = 'MULTIPLY'
+    mixd.inputs['Factor'].default_value = 1.0
     L.new(col, mixd.inputs['A'])
-    mixd.inputs['B'].default_value = rgba('#b67c38')
+    L.new(tone_r.outputs['Color'], mixd.inputs['B'])
     col = mixd.outputs['Result']
 
     # Browned patches on the crust.
@@ -496,15 +548,35 @@ def fried(m, name: str = 'namkeen', dark: float = 1.0):
     r2.inputs['From Min'].default_value = 0.5
     r2.inputs['From Max'].default_value = 0.72
     r2.inputs['To Min'].default_value = 0.0
-    r2.inputs['To Max'].default_value = 0.55
+    r2.inputs['To Max'].default_value = 0.5
     L.new(n2.outputs['Fac'], r2.inputs['Value'])
     mb = nt.nodes.new('ShaderNodeMix')
     mb.data_type = 'RGBA'
     mb.blend_type = 'MULTIPLY'
     L.new(r2.outputs['Result'], mb.inputs['Factor'])
     L.new(col, mb.inputs['A'])
-    mb.inputs['B'].default_value = rgba('#a8763e')
+    mb.inputs['B'].default_value = rgba('#b88448')
     col = mb.outputs['Result']
+
+    # Masala: a reddish-brown spice dusting, caught in patches.
+    n4 = _n(nt, 'ShaderNodeTexNoise', Scale=4.5, Detail=5.0, Roughness=0.65)
+    va = nt.nodes.new('ShaderNodeVectorMath')
+    va.operation = 'ADD'
+    L.new(V, va.inputs[0])
+    va.inputs[1].default_value = (13.0, 7.0, 3.0)
+    L.new(va.outputs[0], n4.inputs['Vector'])
+    r4 = nt.nodes.new('ShaderNodeMapRange')
+    r4.inputs['From Min'].default_value = 0.52
+    r4.inputs['From Max'].default_value = 0.7
+    r4.inputs['To Min'].default_value = 0.0
+    r4.inputs['To Max'].default_value = 0.3
+    L.new(n4.outputs['Fac'], r4.inputs['Value'])
+    mm = nt.nodes.new('ShaderNodeMix')
+    mm.data_type = 'RGBA'
+    L.new(r4.outputs['Result'], mm.inputs['Factor'])
+    L.new(col, mm.inputs['A'])
+    mm.inputs['B'].default_value = rgba('#b46a34')
+    col = mm.outputs['Result']
 
     # Pepper and chilli specks.
     def specks(scale, size, density_scale, colour, seed_off, strength):
@@ -624,6 +696,10 @@ def fried(m, name: str = 'namkeen', dark: float = 1.0):
     p.inputs['Sheen Weight'].default_value = 0.25
     p.inputs['Sheen Roughness'].default_value = 0.6
     p.inputs['Sheen Tint'].default_value = rgba('#f0cf8c')
+    if dark == 1.0:
+        p.inputs['Subsurface Weight'].default_value = 0.12
+        p.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.2)
+        p.inputs['Subsurface Scale'].default_value = 0.08
     return mat
 
 
@@ -641,7 +717,7 @@ def build(m, seed: int = 11):
     meshes = []
     for i in range(36):
         # Whole sticks, and broken short pieces.
-        L = float(rng.uniform(2.0, dims.STICK_L[1])) if i < 24 else float(rng.uniform(*dims.STICK_L_SHORT))
+        L = float(rng.uniform(*dims.STICK_L)) if i < 26 else float(rng.uniform(*dims.STICK_L_SHORT))
         r = float(rng.uniform(*dims.STICK_R))
         bend = float(rng.uniform(0.0, 0.14)) * (L / 3.0)
         protos.append((L, r, bend))
@@ -676,6 +752,53 @@ def build(m, seed: int = 11):
         col.objects.link(ob)
         objs.append(ob)
 
-    core = pouch.build_core(fried(m, 'namkeen-core', dark=0.55), inset_y=CORE_INSET, inset_x=CORE_INSET + 0.05)
+    objs = cull_through_film(objs)
+    core = pouch.build_core(fried(m, 'namkeen-core', dark=0.72), inset_y=CORE_INSET, inset_x=CORE_INSET + 0.05)
     objs.append(core)
     return objs
+
+
+def film_clearance(pts):
+    """Clearance of points (N x 3) inside the built film (the meshes, with
+    their waviness), measured across y: negative means through the film."""
+    import bpy
+
+    out = np.full(len(pts), np.inf)
+    grids = []
+    for name, flip in (('pouch-front', False), ('pouch-back', True)):
+        ob = bpy.data.objects.get(name)
+        if ob is None:
+            return out
+        G = pouch.sheet_grid(ob)
+        grids.append(G[:, ::-1] if flip else G)
+    zs = grids[0][:, 0, 2]
+    k = np.clip(np.searchsorted(zs, pts[:, 2]) - 1, 0, len(zs) - 2)
+    t = np.clip((pts[:, 2] - zs[k]) / (zs[k + 1] - zs[k]), 0.0, 1.0)
+    for row in np.unique(k):
+        sel = k == row
+        x = pts[sel, 0]
+        yf = np.interp(x, grids[0][row, :, 0], grids[0][row, :, 1]) * (1 - t[sel]) + np.interp(x, grids[0][row + 1, :, 0], grids[0][row + 1, :, 1]) * t[sel]
+        yb = np.interp(x, grids[1][row, :, 0], grids[1][row, :, 1]) * (1 - t[sel]) + np.interp(x, grids[1][row + 1, :, 0], grids[1][row + 1, :, 1]) * t[sel]
+        out[sel] = np.minimum(pts[sel, 1] - yf, yb - pts[sel, 1])
+    return out
+
+
+def cull_through_film(objs, clearance: float = 0.03):
+    """Removes the odd stick or crumb that the film's waviness brings within
+    `clearance` of the film (the packing works on the smooth shape)."""
+    import bpy
+
+    bpy.context.view_layer.update()
+    keep = []
+    for ob in objs:
+        me = ob.data
+        co = np.empty(len(me.vertices) * 3)
+        me.vertices.foreach_get('co', co)
+        M = np.array(ob.matrix_world)
+        w = co.reshape(-1, 3) @ M[:3, :3].T + M[:3, 3]
+        if film_clearance(w).min() < clearance:
+            bpy.data.objects.remove(ob)
+        else:
+            keep.append(ob)
+    _dbg('culled near the film', len(objs) - len(keep))
+    return keep

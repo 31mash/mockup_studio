@@ -22,7 +22,8 @@ FILM = 0.004  # half the film gap at the seals (two layers sealed together)
 
 # Half-depth of the pouch at the middle of its width, by height (z, half-depth).
 # Round and full over the opened gusset, easing off towards the fill line,
-# nearly flat at the zip.
+# pinched shut at the zip (its two profiles locked together, about 1.5 mm
+# thick) and flat across the sealed header above it.
 DEPTH = [
     (0.0, 2.7),
     (1.2, 2.9),
@@ -32,9 +33,10 @@ DEPTH = [
     (10.0, 1.75),
     (12.0, 1.42),
     (13.3, 1.0),
-    (14.3, 0.55),
-    (15.0, 0.28),
-    (15.8, 0.1),
+    (14.1, 0.45),
+    (14.6, 0.16),
+    (Z_TOP - ZIP, 0.075),
+    (15.4, 0.05),
     (16.4, 0.02),
     (16.55, FILM),
     (Z_TOP, FILM),
@@ -43,7 +45,8 @@ DEPTH = [
 # panel, so the side seals do not pull in further there (the print is blank).
 GUSSET_Z = (2.6, 4.3)
 
-# Namkeen sticks: thick, crinkly fried gram-flour sticks.
-STICK_R = (0.17, 0.235)  # radius range
-STICK_L = (2.0, 4.2)  # length range, whole sticks
-STICK_L_SHORT = (1.1, 1.9)  # broken pieces
+# Namkeen sticks: crinkly fried gram-flour sticks, 4 to 5 mm thick and up to
+# 5 cm long in the photo (the longest lie across a third of the pouch).
+STICK_R = (0.19, 0.245)  # radius range
+STICK_L = (2.6, 5.0)  # length range, whole sticks
+STICK_L_SHORT = (1.2, 2.3)  # broken pieces
